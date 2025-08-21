@@ -20,7 +20,7 @@ import {
   toKebabCase,
   toPascalCase,
   toRelativeImport,
-} from "./utils/factory-helpers";
+} from "../lib/helpers";
 
 // Recursively build mock object for a selection set
 function buildMockObject(
@@ -75,7 +75,7 @@ function buildMockObject(
 
 const schema = buildSchema(fs.readFileSync("schema.graphql", "utf-8"));
 
-const main = async () => {
+export const handlersCommand = async () => {
   const gqlFiles = glob.sync("src/**/*.{query,mutation}.gql");
   for (const gqlPath of gqlFiles) {
     const content = fs.readFileSync(gqlPath, "utf-8");
@@ -183,7 +183,3 @@ export default ${handlerName};
     console.log(`✅ Generated handler for ${opName} at ${handlerPath}`);
   }
 };
-
-main().catch((err) => {
-  console.error("💥 Error running handler generator:", err);
-});

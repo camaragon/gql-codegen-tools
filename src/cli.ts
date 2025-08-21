@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { factoriesCommand } from "./commands/factories";
+import { handlersCommand } from "./commands/handlers";
+
 const [, , command] = process.argv;
 
 async function run() {
@@ -11,10 +14,10 @@ async function run() {
 
     switch (command) {
       case "factories":
-        await import("../dist/cli.js");
+        await factoriesCommand();
         break;
       case "handlers":
-        await import("../dist/cli.js");
+        await handlersCommand();
         break;
       default:
         console.error(

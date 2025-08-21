@@ -17,19 +17,24 @@ import {
   isEnum,
   isListTypeDeep,
   isScalar,
+  markFactoryAsGenerated,
   resolveEnumAccess,
+  shouldRegenerateFactory,
+  toCamelCase,
   toKebabCase,
   toPascalCase,
   toRelativeImport,
   unwrapType,
-} from "./utils/factory-helpers";
+  updateManualFactory,
+} from "../lib/helpers";
 
 // Constants
 const SCHEMA_PATH = path.resolve("schema.graphql");
 const IDS_PATH = path.resolve("src/gql/ids.ts");
 
 export const generateFactory = async (fragmentPath: string) => {
-  const schema = buildSchema(fs.readFileSync(SCHEMA_PATH, "utf-8"));
+  const schemaContent = fs.readFileSync(SCHEMA_PATH, "utf-8");
+  const schema = buildSchema(schemaContent);
   const idsProject = new Project();
   const idsSource = idsProject.addSourceFileAtPath(IDS_PATH);
   const idsObject = idsSource
@@ -65,11 +70,13 @@ export const generateFactory = async (fragmentPath: string) => {
     );
     const idsRelativePath = toRelativeImport(fragmentDir, IDS_PATH);
 
+    // Build field definitions first
     const imports = [
       `import { ${typeName} } from "./${fragmentBase}.fragment.generated";`,
     ];
     const nestedImports: string[] = [];
     const fields: string[] = [];
+    const fieldDefinitions: Record<string, string> = {};
 
     const fieldToFragmentMap = getFieldFragmentMap(content);
     const topLevelSpreads = getTopLevelFragmentSpreads(content);
@@ -90,6 +97,7 @@ export const generateFactory = async (fragmentPath: string) => {
           fields,
           imports,
         );
+        fieldDefinitions[fieldName] = `ids.${toCamelCase(type.name)}[0]`;
         continue;
       }
 
@@ -99,6 +107,7 @@ export const generateFactory = async (fragmentPath: string) => {
           ? `  ${fieldName}: [${mockValue}],`
           : `  ${fieldName}: ${mockValue},`;
         fields.push(line);
+        fieldDefinitions[fieldName] = isListTypeDeep(gqlField.type) ? `[${mockValue}]` : mockValue;
         continue;
       }
 
@@ -106,6 +115,7 @@ export const generateFactory = async (fragmentPath: string) => {
         const enumAccess = resolveEnumAccess(baseType.name, fragmentDir);
         if (enumAccess.import) nestedImports.push(enumAccess.import);
         fields.push(`  ${fieldName}: ${enumAccess.value},`);
+        fieldDefinitions[fieldName] = enumAccess.value;
         continue;
       }
 
@@ -126,17 +136,16 @@ export const generateFactory = async (fragmentPath: string) => {
       );
 
       if (!fs.existsSync(nestedFactoryPath)) {
-        console.log(`🔁 Generating nested factory for ${fragmentToSearch}`);
         await generateFactory(nestedFragmentPath);
       }
 
       const relPath = toRelativeImport(fragmentDir, nestedFactoryPath);
       nestedImports.push(`import { ${nestedFactoryName} } from "${relPath}";`);
-      fields.push(
-        isListTypeDeep(gqlField.type)
-          ? `  ${fieldName}: [${nestedFactoryName}()],`
-          : `  ${fieldName}: ${nestedFactoryName}(),`,
-      );
+      const factoryCall = isListTypeDeep(gqlField.type)
+        ? `[${nestedFactoryName}()]`
+        : `${nestedFactoryName}()`;
+      fields.push(`  ${fieldName}: ${factoryCall},`);
+      fieldDefinitions[fieldName] = factoryCall;
     }
 
     for (const spread of topLevelSpreads) {
@@ -151,6 +160,29 @@ export const generateFactory = async (fragmentPath: string) => {
     }
 
     fields.push(`  __typename: "${type.name}",`);
+    fieldDefinitions["__typename"] = `"${type.name}"`;
+
+    // Check if factory needs regeneration or update
+    const { shouldRegenerate, reason, requiresUpdate, diff } = shouldRegenerateFactory(
+      filePath, 
+      factoryFilePath, 
+      schemaContent, 
+      fieldDefinitions
+    );
+    
+    if (!shouldRegenerate) {
+      // Don't log anything when no changes
+      continue;
+    }
+    
+    // Handle manual factory updates
+    if (requiresUpdate && diff) {
+      const wasUpdated = updateManualFactory(factoryFilePath, diff, fieldDefinitions);
+      if (wasUpdated) {
+        markFactoryAsGenerated(filePath, factoryFilePath, schemaContent);
+      }
+      continue;
+    }
 
     const fileContent = [
       ...imports,
@@ -166,27 +198,17 @@ export const generateFactory = async (fragmentPath: string) => {
       `});`,
     ].join("\n");
 
+    const isNewFile = !fs.existsSync(factoryFilePath);
     fs.writeFileSync(factoryFilePath, fileContent);
-    console.log(`✅ Generated ${factoryName} at ${factoryFilePath}`);
+    markFactoryAsGenerated(filePath, factoryFilePath, schemaContent);
+    
+    if (isNewFile) {
+      console.log(`Created ${factoryName}`);
+    } else {
+      console.log(`Regenerated ${factoryName}`);
+    }
   }
 
   idsSource.saveSync();
-  console.log("💾 ids.ts updated");
 };
 
-const main = async () => {
-  const fragmentPaths = glob.sync("src/**/*/*.fragment.gql");
-  if (fragmentPaths.length === 0) {
-    console.warn("⚠️  No .fragment.gql files found. Nothing to generate.");
-    return;
-  }
-
-  for (const fragmentPath of fragmentPaths) {
-    console.log(`🔧 Generating factory for ${fragmentPath}`);
-    await generateFactory(fragmentPath);
-  }
-};
-
-main().catch((err) => {
-  console.error("💥 Error running factory generator:", err);
-});
