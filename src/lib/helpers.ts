@@ -367,23 +367,25 @@ export const analyzeFactoryChanges = (
   const added = Array.from(currentFields).filter(field => !existingFields.has(field));
   const removed = Array.from(existingFields).filter(field => !currentFields.has(field));
   
-  // For type changes, we'd need to compare against cached field definitions
-  // For now, we'll consider any field that exists in both as potentially changed
-  // if the overall hash changed
-  const potentially_changed = Array.from(currentFields).filter(field => existingFields.has(field));
+  // Only mark fields as type-changed if we have actual evidence they changed
+  // For now, be conservative and assume unchanged unless we have specific evidence
+  const common_fields = Array.from(currentFields).filter(field => existingFields.has(field));
   
   const currentFragmentHash = crypto.createHash('sha256').update(currentFragmentContent).digest('hex');
   const currentSchemaHash = crypto.createHash('sha256').update(schemaContent).digest('hex');
   
-  const hasChanges = !cached || 
-    cached.fragmentHash !== currentFragmentHash ||
-    cached.schemaHash !== currentSchemaHash;
-
+  const fragmentChanged = cached && cached.fragmentHash !== currentFragmentHash;
+  const schemaChanged = cached && cached.schemaHash !== currentSchemaHash;
+  
+  // Only consider fields type-changed if schema changed (not just fragment)
+  // Fragment changes usually just add/remove fields, schema changes affect types
+  const typeChanged = schemaChanged ? common_fields : [];
+  
   return {
     added,
     removed,
-    typeChanged: hasChanges ? potentially_changed : [],
-    unchanged: hasChanges ? [] : potentially_changed
+    typeChanged,
+    unchanged: common_fields.filter(field => !typeChanged.includes(field))
   };
 };
 
@@ -394,16 +396,37 @@ export const updateManualFactory = (
 ): void => {
   const factoryContent = fs.readFileSync(factoryPath, 'utf-8');
   
-  // Find the default object definition
-  const defaultObjectRegex = /const\s+(\w+):\s*(\w+)\s*=\s*\{([^}]+)\};/s;
-  const match = factoryContent.match(defaultObjectRegex);
-  
-  if (!match) {
-    console.warn(`⚠️  Could not find default object in ${factoryPath}, skipping update`);
+  // Find the default object definition - handle nested objects properly
+  const constMatch = factoryContent.match(/const\s+(\w+):\s*(\w+)\s*=\s*\{/);
+  if (!constMatch) {
+    console.warn(`Could not find default object in ${factoryPath}, skipping update`);
     return;
   }
 
-  const [fullMatch, objectName, typeName, objectBody] = match;
+  const objectName = constMatch[1];
+  const typeName = constMatch[2];
+  
+  // Find the object body by counting braces
+  const startIndex = constMatch.index! + constMatch[0].length - 1; // Start at the opening brace
+  let braceCount = 0;
+  let endIndex = startIndex;
+  
+  for (let i = startIndex; i < factoryContent.length; i++) {
+    if (factoryContent[i] === '{') braceCount++;
+    if (factoryContent[i] === '}') braceCount--;
+    if (braceCount === 0) {
+      endIndex = i;
+      break;
+    }
+  }
+  
+  if (braceCount !== 0) {
+    console.warn(`Could not find matching brace in ${factoryPath}, skipping update`);
+    return;
+  }
+  
+  const objectBody = factoryContent.substring(startIndex + 1, endIndex);
+  const fullMatch = factoryContent.substring(constMatch.index!, endIndex + 2); // Include "};"
   
   // Parse existing fields
   const existingFields = new Map<string, string>();
@@ -478,6 +501,113 @@ export const updateManualFactory = (
 };
 
 const isDefaultGeneratedValue = (value: string): boolean => {
-  // Check if value looks like a generated mock value
-  return /^(faker\.|"mock-|createMock|\[.*\]|true|false|\d+)/.test(value.trim());
+  const trimmed = value.trim();
+  
+  // Be very conservative - only update values that are clearly auto-generated patterns
+  return (
+    // Faker calls
+    /^faker\./.test(trimmed) ||
+    // Mock string patterns
+    /^"mock-\w+"$/.test(trimmed) ||
+    // Factory function calls
+    /^createMock\w+\(\)$/.test(trimmed) ||
+    // Arrays with factory calls
+    /^\[createMock\w+\(\)\]$/.test(trimmed) ||
+    // Empty arrays or null/undefined
+    trimmed === '[]' || trimmed === 'null' || trimmed === 'undefined'
+    // Deliberately NOT including numbers, booleans, or custom strings
+  );
+};
+
+export const shouldRegenerateHandler = (
+  gqlPath: string,
+  handlerPath: string,
+  schemaContent: string,
+): { shouldRegenerate: boolean; reason: string } => {
+  if (!fs.existsSync(handlerPath)) {
+    return { 
+      shouldRegenerate: true, 
+      reason: `Creating new handler` 
+    };
+  }
+
+  // Check if handler is manually modified (has manual markers)
+  const handlerContent = fs.readFileSync(handlerPath, 'utf-8');
+  const manualMarkers = [
+    /\/\/ @manual/i,
+    /\/\* @manual/i,
+    /\/\/ Manual handler/i,
+    /\/\* Manual handler/i,
+    /\/\/ Custom/i,
+  ];
+  
+  const isManualHandler = manualMarkers.some(marker => marker.test(handlerContent));
+  
+  if (isManualHandler) {
+    return { 
+      shouldRegenerate: false, 
+      reason: `` // Don't log for manual handlers
+    };
+  }
+
+  // Check cache for previous generation
+  const cache = loadCache();
+  const cached = cache[handlerPath];
+  
+  if (!cached) {
+    // No cache entry - assume it was manually created, don't regenerate
+    return { 
+      shouldRegenerate: false, 
+      reason: `` // Don't regenerate files without cache history
+    };
+  }
+
+  // Check if handler was manually modified after our last generation
+  const handlerStat = fs.statSync(handlerPath);
+  const wasManuallyModified = handlerStat.mtime.getTime() > cached.lastGenerated;
+  
+  if (wasManuallyModified) {
+    return { 
+      shouldRegenerate: false, 
+      reason: `` // Don't log for manually modified handlers
+    };
+  }
+
+  // Check for changes in source files
+  const gqlContent = fs.readFileSync(gqlPath, 'utf-8');
+  const currentGqlHash = crypto.createHash('sha256').update(gqlContent).digest('hex');
+  const currentSchemaHash = crypto.createHash('sha256').update(schemaContent).digest('hex');
+  
+  const shouldRegenerate = cached.fragmentHash !== currentGqlHash ||
+    cached.schemaHash !== currentSchemaHash;
+
+  if (shouldRegenerate) {
+    return { 
+      shouldRegenerate: true, 
+      reason: `Regenerating handler` 
+    };
+  } else {
+    return { 
+      shouldRegenerate: false, 
+      reason: `` // Don't log when no changes
+    };
+  }
+};
+
+export const markHandlerAsGenerated = (
+  gqlPath: string,
+  handlerPath: string,
+  schemaContent: string,
+): void => {
+  const cache = loadCache();
+  const gqlContent = fs.readFileSync(gqlPath, 'utf-8');
+  
+  cache[handlerPath] = {
+    fragmentHash: crypto.createHash('sha256').update(gqlContent).digest('hex'),
+    schemaHash: crypto.createHash('sha256').update(schemaContent).digest('hex'),
+    lastGenerated: Date.now(),
+    autoGenerated: true
+  };
+  
+  saveCache(cache);
 };

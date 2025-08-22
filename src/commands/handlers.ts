@@ -17,6 +17,8 @@ import {
   getNamedType,
 } from "graphql";
 import {
+  markHandlerAsGenerated,
+  shouldRegenerateHandler,
   toKebabCase,
   toPascalCase,
   toRelativeImport,
@@ -65,18 +67,22 @@ function buildMockObject(
         imports.add(`import { ${factoryName} } from "${relImport}";`);
         factories.add(factoryName);
         lines.push(`  ...${factoryName}(),`);
-      } else {
-        lines.push(`  // TODO: Factory for ${fragName} not found`);
       }
     }
   }
   return lines.map((l) => (l.startsWith("  ") ? l : "    " + l)).join("\n");
 }
 
-const schema = buildSchema(fs.readFileSync("schema.graphql", "utf-8"));
+const schemaContent = fs.readFileSync("schema.graphql", "utf-8");
+const schema = buildSchema(schemaContent);
 
 export const handlersCommand = async () => {
   const gqlFiles = glob.sync("src/**/*.{query,mutation}.gql");
+  if (gqlFiles.length === 0) {
+    console.warn("No .{query,mutation}.gql files found. Nothing to generate.");
+    return;
+  }
+
   for (const gqlPath of gqlFiles) {
     const content = fs.readFileSync(gqlPath, "utf-8");
     const ast = parse(content);
@@ -161,7 +167,7 @@ export const handlersCommand = async () => {
     let handlerContent = `import { HttpResponse } from "msw";
 import { fn } from "@storybook/test";
 ${Array.from(imports).join("\n")}
-${relMockHandlerImport ? `import { ${mockHandlerName} } from "${relMockHandlerImport}";` : "// TODO: mock handler import"}
+${relMockHandlerImport ? `import { ${mockHandlerName} } from "${relMockHandlerImport}";` : ""}
 
 export const ${spyName} = fn();
 
@@ -179,7 +185,23 @@ export default ${handlerName};
       .basename(gqlPath)
       .replace(/\.(query|mutation)\.gql$/, "");
     const handlerPath = path.join(dir, `${baseFileName}.handler.ts`);
+    
+    // Check if handler needs regeneration
+    const { shouldRegenerate, reason } = shouldRegenerateHandler(gqlPath, handlerPath, schemaContent);
+    
+    if (!shouldRegenerate) {
+      // Don't log anything when no changes
+      continue;
+    }
+    
+    const isNewFile = !fs.existsSync(handlerPath);
     fs.writeFileSync(handlerPath, handlerContent);
-    console.log(`✅ Generated handler for ${opName} at ${handlerPath}`);
+    markHandlerAsGenerated(gqlPath, handlerPath, schemaContent);
+    
+    if (isNewFile) {
+      console.log(`Created ${handlerName} handler`);
+    } else {
+      console.log(`Regenerated ${handlerName} handler`);
+    }
   }
 };
