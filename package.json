@@ -1,21 +1,48 @@
 {
   "name": "gql-codegen-tools",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "CLI tool for generating TypeScript mock factories and MSW handlers from GraphQL fragments and operations",
+  "main": "dist/cli.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "esbuild src/cli.ts --bundle --platform=node --outdir=dist --format=cjs"
+    "clean": "rm -rf dist",
+    "build": "npm run clean && esbuild src/cli.ts --bundle --platform=node --outdir=dist --format=cjs",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
     "gql-codegen-tools": "./bin/gql-codegen-tools.js"
   },
-  "keywords": [],
-  "author": "",
+  "files": [
+    "dist/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "graphql",
+    "codegen",
+    "typescript",
+    "mock",
+    "factory",
+    "msw",
+    "testing",
+    "cli"
+  ],
+  "author": "Cameron Aragon <caragon4695@gmail.com>",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/camaragon/gql-codegen-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/camaragon/gql-codegen-tools/issues"
+  },
+  "homepage": "https://github.com/camaragon/gql-codegen-tools#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "packageManager": "pnpm@10.12.1",
   "type": "commonjs",
-  "typeScript": true,
   "dependencies": {
     "fast-glob": "^3.3.3",
     "graphql": "^16.11.0",
