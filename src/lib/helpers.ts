@@ -47,6 +47,87 @@ export const toRelativeImport = (from: string, to: string): string => {
   return rel.startsWith(".") ? rel : `./${rel}`;
 };
 
+export const normalizeModulePath = (modulePath: string): string => {
+  // Convert to posix paths
+  let normalized = modulePath.replace(/\\/g, "/");
+  
+  // Drop file extensions
+  normalized = normalized.replace(/\.(ts|js|tsx|jsx)$/, "");
+  
+  // Strip /index suffix
+  normalized = normalized.replace(/\/index$/, "");
+  
+  // Collapse ./../ patterns
+  const parts = normalized.split("/");
+  const collapsed: string[] = [];
+  
+  for (const part of parts) {
+    if (part === "..") {
+      if (collapsed.length > 0 && collapsed[collapsed.length - 1] !== "..") {
+        collapsed.pop();
+      } else {
+        collapsed.push(part);
+      }
+    } else if (part !== "." && part !== "") {
+      collapsed.push(part);
+    }
+  }
+  
+  const result = collapsed.join("/");
+  
+  // Ensure relative paths start with ./ or ../
+  if (result && !result.startsWith(".") && !result.startsWith("/")) {
+    return "./" + result;
+  }
+  
+  return result || ".";
+};
+
+export const resolveModule = (fromDir: string, rawPath: string): string => {
+  // If it's a relative path, resolve it directly
+  if (rawPath.startsWith("./") || rawPath.startsWith("../") || rawPath.startsWith("/")) {
+    const resolved = path.resolve(fromDir, rawPath);
+    const relative = path.relative(fromDir, resolved);
+    return normalizeModulePath(relative);
+  }
+  
+  // For bare module names (e.g., "models", "utilities"), walk up the directory tree
+  const extensions = [".ts", ".tsx", ".js", ".jsx"];
+  const indexFiles = extensions.map(ext => `index${ext}`);
+  
+  let currentDir = path.resolve(fromDir);
+  
+  // Walk up the directory tree
+  while (currentDir !== path.dirname(currentDir)) {
+    // Check direct file matches: <dir>/<raw>{,.ts,.tsx,.js}
+    for (const ext of ["", ...extensions]) {
+      const candidate = path.join(currentDir, `${rawPath}${ext}`);
+      if (fs.existsSync(candidate)) {
+        const relative = path.relative(fromDir, candidate);
+        return normalizeModulePath(relative);
+      }
+    }
+    
+    // Check index file matches: <dir>/<raw>/index{.ts,.tsx,.js}
+    const rawDir = path.join(currentDir, rawPath);
+    if (fs.existsSync(rawDir) && fs.statSync(rawDir).isDirectory()) {
+      for (const indexFile of indexFiles) {
+        const candidate = path.join(rawDir, indexFile);
+        if (fs.existsSync(candidate)) {
+          const relative = path.relative(fromDir, rawDir);
+          return normalizeModulePath(relative);
+        }
+      }
+    }
+    
+    // Move up one directory
+    currentDir = path.dirname(currentDir);
+  }
+  
+  // If not found, return as-is but normalized (might be a node_modules import)
+  return normalizeModulePath(rawPath);
+};
+
 export const getFieldFragmentMap = (content: string): Record<string, string> =>
   Object.fromEntries(
     [...content.matchAll(/(\w+)\s*\{\s*\.\.\.(\w+)/g)].map(
@@ -54,19 +135,42 @@ export const getFieldFragmentMap = (content: string): Record<string, string> =>
     ),
   );
 
-export const getTopLevelFragmentSpreads = (content: string): string[] =>
-  parse(content).definitions.flatMap((def) =>
-    def.kind === "FragmentDefinition"
-      ? def.selectionSet.selections
-          .filter((s) => s.kind === "FragmentSpread")
-          .map((s) => s.name.value)
-      : [],
-  );
+export const getTopLevelFragmentSpreads = (content: string): Set<string> => {
+  const ast = parse(content);
+  const spreads = new Set<string>();
+  
+  const collectFragmentSpreads = (selections: any[]): void => {
+    for (const selection of selections) {
+      if (selection.kind === "FragmentSpread") {
+        spreads.add(selection.name.value);
+      } else if (selection.kind === "InlineFragment" && selection.selectionSet) {
+        collectFragmentSpreads(selection.selectionSet.selections);
+      } else if (selection.kind === "Field" && selection.selectionSet) {
+        collectFragmentSpreads(selection.selectionSet.selections);
+      }
+    }
+  };
+  
+  ast.definitions.forEach((def) => {
+    if (def.kind === "FragmentDefinition") {
+      collectFragmentSpreads(def.selectionSet.selections);
+    }
+  });
+  
+  return spreads;
+};
 
 export const extractFragmentName = (filePath: string): string => {
   const content = fs.readFileSync(filePath, "utf-8");
   const match = content.match(/fragment (\w+) on/);
   if (!match) throw new Error(`Fragment name not found in ${filePath}`);
+  return match[1];
+};
+
+export const getFragmentTypeCondition = (filePath: string): string => {
+  const content = fs.readFileSync(filePath, "utf-8");
+  const match = content.match(/fragment \w+ on (\w+)/);
+  if (!match) throw new Error(`Fragment type condition not found in ${filePath}`);
   return match[1];
 };
 
@@ -389,12 +493,81 @@ export const analyzeFactoryChanges = (
   };
 };
 
+
+interface UpdateManualFactoryOptions {
+  mergedImports?: string[];
+}
+
 export const updateManualFactory = (
   factoryPath: string,
   diff: FieldDiff,
   newFieldDefinitions: Record<string, string>,
-): void => {
+  options: UpdateManualFactoryOptions = {}
+): boolean => {
+  const { mergedImports = [] } = options;
   const factoryContent = fs.readFileSync(factoryPath, 'utf-8');
+  
+  // Create comprehensive import manager
+  const importManager = new Map<string, Set<string>>(); // module -> symbols
+  const literalImports = new Set<string>();
+  
+  // Parse existing imports
+  const baseDir = path.dirname(factoryPath);
+  const lines = factoryContent.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('import ')) continue;
+    
+    const namedMatch = trimmed.match(/^import\s*\{\s*([^}]+)\s*\}\s*from\s*["']([^"']+)["'];?$/);
+    if (namedMatch) {
+      const [, importsStr, rawPath] = namedMatch;
+      const resolvedPath = resolveModule(baseDir, rawPath);
+      const normalizedPath = normalizeModulePath(resolvedPath);
+      const symbols = importsStr.split(',').map(s => s.trim()).filter(Boolean);
+      
+      if (!importManager.has(normalizedPath)) {
+        importManager.set(normalizedPath, new Set());
+      }
+      for (const symbol of symbols) {
+        importManager.get(normalizedPath)!.add(symbol);
+      }
+    } else {
+      literalImports.add(trimmed);
+    }
+  }
+  
+  // Merge in new imports
+  for (const newImport of mergedImports) {
+    const namedMatch = newImport.match(/^import\s*\{\s*([^}]+)\s*\}\s*from\s*["']([^"']+)["'];?$/);
+    if (namedMatch) {
+      const [, importsStr, rawPath] = namedMatch;
+      const resolvedPath = resolveModule(baseDir, rawPath);
+      const normalizedPath = normalizeModulePath(resolvedPath);
+      const symbols = importsStr.split(',').map(s => s.trim()).filter(Boolean);
+      
+      if (!importManager.has(normalizedPath)) {
+        importManager.set(normalizedPath, new Set());
+      }
+      for (const symbol of symbols) {
+        importManager.get(normalizedPath)!.add(symbol);
+      }
+    } else {
+      literalImports.add(newImport);
+    }
+  }
+  
+  // Build final import lines
+  const finalImports: string[] = [];
+  finalImports.push(...Array.from(literalImports).sort());
+  
+  const sortedModules = Array.from(importManager.keys()).sort();
+  for (const modulePath of sortedModules) {
+    const symbols = importManager.get(modulePath)!;
+    if (symbols.size > 0) {
+      const sortedSymbols = Array.from(symbols).sort().join(', ');
+      finalImports.push(`import { ${sortedSymbols} } from "${modulePath}";`);
+    }
+  }
   
   // Find the default object definition - handle nested objects properly
   const constMatch = factoryContent.match(/const\s+(\w+):\s*(\w+)\s*=\s*\{/);
@@ -451,17 +624,28 @@ export const updateManualFactory = (
     }
   }
 
+  // Preserve any existing fields not in the diff (avoid deleting unknown keys in manual files)
+  const processedFields = new Set([...diff.unchanged, ...diff.added, ...diff.typeChanged, ...diff.removed]);
+  for (const [fieldName, fieldValue] of existingFields.entries()) {
+    if (!processedFields.has(fieldName) && fieldName !== '__typename') {
+      updatedFields.set(fieldName, fieldValue);
+    }
+  }
+
   // Add new fields
   for (const field of diff.added) {
-    if (newFieldDefinitions[field]) {
+    if (newFieldDefinitions[field] && newFieldDefinitions[field] !== "__KEEP_EXISTING__") {
       updatedFields.set(field, newFieldDefinitions[field]);
       actualChanges.push(`+${field}`);
+    } else if (newFieldDefinitions[field] === "__KEEP_EXISTING__" && existingFields.has(field)) {
+      // Preserve existing field value for __KEEP_EXISTING__ sentinel
+      updatedFields.set(field, existingFields.get(field)!);
     }
   }
 
   // Update type-changed fields (but try to preserve custom values when possible)
   for (const field of diff.typeChanged) {
-    if (newFieldDefinitions[field]) {
+    if (newFieldDefinitions[field] && newFieldDefinitions[field] !== "__KEEP_EXISTING__") {
       const existingValue = existingFields.get(field);
       const newValue = newFieldDefinitions[field];
       
@@ -474,6 +658,9 @@ export const updateManualFactory = (
         updatedFields.set(field, newValue);
         actualChanges.push(`~${field}`);
       }
+    } else if (newFieldDefinitions[field] === "__KEEP_EXISTING__" && existingFields.has(field)) {
+      // Preserve existing field value for __KEEP_EXISTING__ sentinel
+      updatedFields.set(field, existingFields.get(field)!);
     }
   }
 
@@ -488,7 +675,46 @@ export const updateManualFactory = (
     .join('\n');
 
   const newDefaultObject = `const ${objectName}: ${typeName} = {\n${newObjectBody}\n};`;
-  const updatedContent = factoryContent.replace(fullMatch, newDefaultObject);
+  
+  // Build the complete updated content with merged imports
+  let updatedContent = factoryContent;
+  
+  // Replace the object definition
+  updatedContent = updatedContent.replace(fullMatch, newDefaultObject);
+  
+  // Handle imports if there are changes or new imports to merge
+  if (actualChanges.length > 0 || finalImports.length > 0) {
+    // Find where imports end and content begins
+    const lines = updatedContent.split('\n');
+    let importEndIndex = 0;
+    
+    // Find the last import line
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('import ') || (line === '' && i < lines.length - 1 && lines[i + 1].trim().startsWith('import '))) {
+        importEndIndex = i;
+      } else if (line && !line.startsWith('import ') && importEndIndex > 0) {
+        break;
+      }
+    }
+    
+    // Remove old imports and rebuild with merged imports
+    const contentAfterImports = lines.slice(importEndIndex + 1);
+    
+    // Remove empty lines at the start of content
+    while (contentAfterImports.length > 0 && contentAfterImports[0].trim() === '') {
+      contentAfterImports.shift();
+    }
+    
+    // Build new content with merged imports
+    const newContent = [
+      ...finalImports,
+      '',
+      ...contentAfterImports
+    ].join('\n');
+    
+    updatedContent = newContent;
+  }
   
   // Only write and log if there were actual changes
   if (actualChanges.length > 0) {

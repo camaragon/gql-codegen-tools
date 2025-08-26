@@ -291945,18 +291945,96 @@ var toRelativeImport = (from, to) => {
   const rel = import_path.default.relative(from, to).replace(/\\/g, "/").replace(/\.ts$/, "");
   return rel.startsWith(".") ? rel : `./${rel}`;
 };
+var normalizeModulePath = (modulePath) => {
+  let normalized = modulePath.replace(/\\/g, "/");
+  normalized = normalized.replace(/\.(ts|js|tsx|jsx)$/, "");
+  normalized = normalized.replace(/\/index$/, "");
+  const parts = normalized.split("/");
+  const collapsed = [];
+  for (const part of parts) {
+    if (part === "..") {
+      if (collapsed.length > 0 && collapsed[collapsed.length - 1] !== "..") {
+        collapsed.pop();
+      } else {
+        collapsed.push(part);
+      }
+    } else if (part !== "." && part !== "") {
+      collapsed.push(part);
+    }
+  }
+  const result = collapsed.join("/");
+  if (result && !result.startsWith(".") && !result.startsWith("/")) {
+    return "./" + result;
+  }
+  return result || ".";
+};
+var resolveModule = (fromDir, rawPath) => {
+  if (rawPath.startsWith("./") || rawPath.startsWith("../") || rawPath.startsWith("/")) {
+    const resolved = import_path.default.resolve(fromDir, rawPath);
+    const relative = import_path.default.relative(fromDir, resolved);
+    return normalizeModulePath(relative);
+  }
+  const extensions = [".ts", ".tsx", ".js", ".jsx"];
+  const indexFiles = extensions.map((ext) => `index${ext}`);
+  let currentDir = import_path.default.resolve(fromDir);
+  while (currentDir !== import_path.default.dirname(currentDir)) {
+    for (const ext of ["", ...extensions]) {
+      const candidate = import_path.default.join(currentDir, `${rawPath}${ext}`);
+      if (import_fs.default.existsSync(candidate)) {
+        const relative = import_path.default.relative(fromDir, candidate);
+        return normalizeModulePath(relative);
+      }
+    }
+    const rawDir = import_path.default.join(currentDir, rawPath);
+    if (import_fs.default.existsSync(rawDir) && import_fs.default.statSync(rawDir).isDirectory()) {
+      for (const indexFile of indexFiles) {
+        const candidate = import_path.default.join(rawDir, indexFile);
+        if (import_fs.default.existsSync(candidate)) {
+          const relative = import_path.default.relative(fromDir, rawDir);
+          return normalizeModulePath(relative);
+        }
+      }
+    }
+    currentDir = import_path.default.dirname(currentDir);
+  }
+  return normalizeModulePath(rawPath);
+};
 var getFieldFragmentMap = (content) => Object.fromEntries(
   [...content.matchAll(/(\w+)\s*\{\s*\.\.\.(\w+)/g)].map(
     ([_3, field, frag]) => [field, frag]
   )
 );
-var getTopLevelFragmentSpreads = (content) => (0, import_graphql.parse)(content).definitions.flatMap(
-  (def) => def.kind === "FragmentDefinition" ? def.selectionSet.selections.filter((s2) => s2.kind === "FragmentSpread").map((s2) => s2.name.value) : []
-);
+var getTopLevelFragmentSpreads = (content) => {
+  const ast = (0, import_graphql.parse)(content);
+  const spreads = /* @__PURE__ */ new Set();
+  const collectFragmentSpreads = (selections) => {
+    for (const selection of selections) {
+      if (selection.kind === "FragmentSpread") {
+        spreads.add(selection.name.value);
+      } else if (selection.kind === "InlineFragment" && selection.selectionSet) {
+        collectFragmentSpreads(selection.selectionSet.selections);
+      } else if (selection.kind === "Field" && selection.selectionSet) {
+        collectFragmentSpreads(selection.selectionSet.selections);
+      }
+    }
+  };
+  ast.definitions.forEach((def) => {
+    if (def.kind === "FragmentDefinition") {
+      collectFragmentSpreads(def.selectionSet.selections);
+    }
+  });
+  return spreads;
+};
 var extractFragmentName = (filePath) => {
   const content = import_fs.default.readFileSync(filePath, "utf-8");
   const match = content.match(/fragment (\w+) on/);
   if (!match) throw new Error(`Fragment name not found in ${filePath}`);
+  return match[1];
+};
+var getFragmentTypeCondition = (filePath) => {
+  const content = import_fs.default.readFileSync(filePath, "utf-8");
+  const match = content.match(/fragment \w+ on (\w+)/);
+  if (!match) throw new Error(`Fragment type condition not found in ${filePath}`);
   return match[1];
 };
 var handleIdField = (type, idsObject, baseType, idsImportPath, fields, imports) => {
@@ -292161,8 +292239,59 @@ var analyzeFactoryChanges = (fragmentPath, factoryPath, schemaContent2, currentF
     unchanged: common_fields.filter((field) => !typeChanged.includes(field))
   };
 };
-var updateManualFactory = (factoryPath, diff, newFieldDefinitions) => {
+var updateManualFactory = (factoryPath, diff, newFieldDefinitions, options = {}) => {
+  const { mergedImports = [] } = options;
   const factoryContent = import_fs.default.readFileSync(factoryPath, "utf-8");
+  const importManager = /* @__PURE__ */ new Map();
+  const literalImports = /* @__PURE__ */ new Set();
+  const baseDir = import_path.default.dirname(factoryPath);
+  const lines = factoryContent.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("import ")) continue;
+    const namedMatch = trimmed.match(/^import\s*\{\s*([^}]+)\s*\}\s*from\s*["']([^"']+)["'];?$/);
+    if (namedMatch) {
+      const [, importsStr, rawPath] = namedMatch;
+      const resolvedPath = resolveModule(baseDir, rawPath);
+      const normalizedPath = normalizeModulePath(resolvedPath);
+      const symbols = importsStr.split(",").map((s2) => s2.trim()).filter(Boolean);
+      if (!importManager.has(normalizedPath)) {
+        importManager.set(normalizedPath, /* @__PURE__ */ new Set());
+      }
+      for (const symbol of symbols) {
+        importManager.get(normalizedPath).add(symbol);
+      }
+    } else {
+      literalImports.add(trimmed);
+    }
+  }
+  for (const newImport of mergedImports) {
+    const namedMatch = newImport.match(/^import\s*\{\s*([^}]+)\s*\}\s*from\s*["']([^"']+)["'];?$/);
+    if (namedMatch) {
+      const [, importsStr, rawPath] = namedMatch;
+      const resolvedPath = resolveModule(baseDir, rawPath);
+      const normalizedPath = normalizeModulePath(resolvedPath);
+      const symbols = importsStr.split(",").map((s2) => s2.trim()).filter(Boolean);
+      if (!importManager.has(normalizedPath)) {
+        importManager.set(normalizedPath, /* @__PURE__ */ new Set());
+      }
+      for (const symbol of symbols) {
+        importManager.get(normalizedPath).add(symbol);
+      }
+    } else {
+      literalImports.add(newImport);
+    }
+  }
+  const finalImports = [];
+  finalImports.push(...Array.from(literalImports).sort());
+  const sortedModules = Array.from(importManager.keys()).sort();
+  for (const modulePath of sortedModules) {
+    const symbols = importManager.get(modulePath);
+    if (symbols.size > 0) {
+      const sortedSymbols = Array.from(symbols).sort().join(", ");
+      finalImports.push(`import { ${sortedSymbols} } from "${modulePath}";`);
+    }
+  }
   const constMatch = factoryContent.match(/const\s+(\w+):\s*(\w+)\s*=\s*\{/);
   if (!constMatch) {
     console.warn(`Could not find default object in ${factoryPath}, skipping update`);
@@ -292203,14 +292332,22 @@ var updateManualFactory = (factoryPath, diff, newFieldDefinitions) => {
       updatedFields.set(field, existingFields.get(field));
     }
   }
+  const processedFields = /* @__PURE__ */ new Set([...diff.unchanged, ...diff.added, ...diff.typeChanged, ...diff.removed]);
+  for (const [fieldName, fieldValue] of existingFields.entries()) {
+    if (!processedFields.has(fieldName) && fieldName !== "__typename") {
+      updatedFields.set(fieldName, fieldValue);
+    }
+  }
   for (const field of diff.added) {
-    if (newFieldDefinitions[field]) {
+    if (newFieldDefinitions[field] && newFieldDefinitions[field] !== "__KEEP_EXISTING__") {
       updatedFields.set(field, newFieldDefinitions[field]);
       actualChanges.push(`+${field}`);
+    } else if (newFieldDefinitions[field] === "__KEEP_EXISTING__" && existingFields.has(field)) {
+      updatedFields.set(field, existingFields.get(field));
     }
   }
   for (const field of diff.typeChanged) {
-    if (newFieldDefinitions[field]) {
+    if (newFieldDefinitions[field] && newFieldDefinitions[field] !== "__KEEP_EXISTING__") {
       const existingValue = existingFields.get(field);
       const newValue = newFieldDefinitions[field];
       if (existingValue && !isDefaultGeneratedValue(existingValue)) {
@@ -292219,6 +292356,8 @@ var updateManualFactory = (factoryPath, diff, newFieldDefinitions) => {
         updatedFields.set(field, newValue);
         actualChanges.push(`~${field}`);
       }
+    } else if (newFieldDefinitions[field] === "__KEEP_EXISTING__" && existingFields.has(field)) {
+      updatedFields.set(field, existingFields.get(field));
     }
   }
   if (existingFields.has("__typename")) {
@@ -292228,7 +292367,30 @@ var updateManualFactory = (factoryPath, diff, newFieldDefinitions) => {
   const newDefaultObject = `const ${objectName}: ${typeName} = {
 ${newObjectBody}
 };`;
-  const updatedContent = factoryContent.replace(fullMatch, newDefaultObject);
+  let updatedContent = factoryContent;
+  updatedContent = updatedContent.replace(fullMatch, newDefaultObject);
+  if (actualChanges.length > 0 || finalImports.length > 0) {
+    const lines2 = updatedContent.split("\n");
+    let importEndIndex = 0;
+    for (let i2 = 0; i2 < lines2.length; i2++) {
+      const line = lines2[i2].trim();
+      if (line.startsWith("import ") || line === "" && i2 < lines2.length - 1 && lines2[i2 + 1].trim().startsWith("import ")) {
+        importEndIndex = i2;
+      } else if (line && !line.startsWith("import ") && importEndIndex > 0) {
+        break;
+      }
+    }
+    const contentAfterImports = lines2.slice(importEndIndex + 1);
+    while (contentAfterImports.length > 0 && contentAfterImports[0].trim() === "") {
+      contentAfterImports.shift();
+    }
+    const newContent = [
+      ...finalImports,
+      "",
+      ...contentAfterImports
+    ].join("\n");
+    updatedContent = newContent;
+  }
   if (actualChanges.length > 0) {
     import_fs.default.writeFileSync(factoryPath, updatedContent);
     console.log(`Updated ${factoryPath}: ${actualChanges.join(", ")}`);
@@ -292349,75 +292511,195 @@ var generateFactory = async (fragmentPath) => {
       `${fragmentBase}.factory.ts`
     );
     const idsRelativePath = toRelativeImport(fragmentDir, IDS_PATH);
+    class ImportManager {
+      constructor(baseDir, existingFactoryPath) {
+        this.namedImports = /* @__PURE__ */ new Map();
+        // module -> symbols
+        this.literalImports = /* @__PURE__ */ new Set();
+        // full import statements
+        this.symbolToModule = /* @__PURE__ */ new Map();
+        this.baseDir = baseDir;
+        if (existingFactoryPath && import_fs2.default.existsSync(existingFactoryPath)) {
+          this.seedFromExistingFile(existingFactoryPath);
+        }
+      }
+      seedFromExistingFile(filePath2) {
+        const content2 = import_fs2.default.readFileSync(filePath2, "utf-8");
+        const lines = content2.split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("import ")) continue;
+          const namedMatch = trimmed.match(/^import\s*\{\s*([^}]+)\s*\}\s*from\s*["']([^"']+)["'];?$/);
+          if (namedMatch) {
+            const [, importsStr, rawPath] = namedMatch;
+            const resolvedPath = resolveModule(this.baseDir, rawPath);
+            const symbols = importsStr.split(",").map((s2) => s2.trim()).filter(Boolean);
+            for (const symbol of symbols) {
+              this.addNamedImport(resolvedPath, symbol);
+            }
+            continue;
+          }
+          this.literalImports.add(trimmed);
+        }
+      }
+      addLiteralImport(importStatement) {
+        this.literalImports.add(importStatement);
+      }
+      addNamedImport(modulePath, symbol) {
+        const resolvedPath = resolveModule(this.baseDir, modulePath);
+        const normalizedPath = normalizeModulePath(resolvedPath);
+        const existingModule = this.symbolToModule.get(symbol);
+        if (existingModule === normalizedPath) {
+          return;
+        }
+        if (existingModule && existingModule !== normalizedPath) {
+          const currentDepth = normalizedPath.split("/").length;
+          const existingDepth = existingModule.split("/").length;
+          if (currentDepth < existingDepth || normalizedPath.startsWith("./") && !existingModule.startsWith("./")) {
+            this.removeSymbolFromModule(existingModule, symbol);
+          } else {
+            return;
+          }
+        }
+        this.symbolToModule.set(symbol, normalizedPath);
+        if (!this.namedImports.has(normalizedPath)) {
+          this.namedImports.set(normalizedPath, /* @__PURE__ */ new Set());
+        }
+        this.namedImports.get(normalizedPath).add(symbol);
+      }
+      removeSymbolFromModule(modulePath, symbol) {
+        const symbols = this.namedImports.get(modulePath);
+        if (symbols) {
+          symbols.delete(symbol);
+          if (symbols.size === 0) {
+            this.namedImports.delete(modulePath);
+          }
+        }
+      }
+      buildMergedImports() {
+        const imports2 = [];
+        imports2.push(...Array.from(this.literalImports).sort());
+        const sortedModules = Array.from(this.namedImports.keys()).sort();
+        for (const modulePath of sortedModules) {
+          const symbols = this.namedImports.get(modulePath);
+          if (symbols.size > 0) {
+            const sortedSymbols = Array.from(symbols).sort().join(", ");
+            imports2.push(`import { ${sortedSymbols} } from "${modulePath}";`);
+          }
+        }
+        return imports2;
+      }
+    }
+    const importManager = new ImportManager(fragmentDir, factoryFilePath);
     const imports = [
       `import { ${typeName} } from "./${fragmentBase}.fragment.generated";`
     ];
-    const nestedImports = [];
     const fields = [];
     const fieldDefinitions = {};
     const fieldToFragmentMap = getFieldFragmentMap(content);
     const topLevelSpreads = getTopLevelFragmentSpreads(content);
-    for (const selection of fragment.selectionSet.selections) {
-      if (selection.kind !== "Field") continue;
-      const fieldName = selection.name.value;
-      const gqlField = type.getFields()[fieldName];
-      const baseType = unwrapType(gqlField.type);
-      if (fieldName === "id") {
-        handleIdField(
-          type,
-          idsObject,
-          baseType,
-          idsRelativePath,
-          fields,
-          imports
-        );
-        fieldDefinitions[fieldName] = `ids.${toCamelCase(type.name)}[0]`;
-        continue;
+    const processSelections = async (selections, level = 0) => {
+      for (const selection of selections) {
+        if (selection.kind === "Field") {
+          const fieldName = selection.alias?.value ?? selection.name.value;
+          const gqlFieldName = selection.name.value;
+          const gqlField = type.getFields()[gqlFieldName];
+          if (!gqlField) {
+            fieldDefinitions[fieldName] = "__KEEP_EXISTING__";
+            continue;
+          }
+          const baseType = unwrapType(gqlField.type);
+          if (gqlFieldName === "id") {
+            handleIdField(
+              type,
+              idsObject,
+              baseType,
+              idsRelativePath,
+              fields,
+              imports
+            );
+            const idsModule = resolveModule(fragmentDir, IDS_PATH);
+            importManager.addNamedImport(idsModule, "ids");
+            fieldDefinitions[fieldName] = `ids.${toCamelCase(type.name)}[0]`;
+            continue;
+          }
+          if (isScalar(baseType)) {
+            const mockValue = getFakerMockForScalar(baseType.name, gqlFieldName);
+            const line = isListTypeDeep(gqlField.type) ? `  ${fieldName}: [${mockValue}],` : `  ${fieldName}: ${mockValue},`;
+            fields.push(line);
+            fieldDefinitions[fieldName] = isListTypeDeep(gqlField.type) ? `[${mockValue}]` : mockValue;
+            continue;
+          }
+          if (isEnum(baseType)) {
+            const enumAccess = resolveEnumAccess(baseType.name, fragmentDir);
+            if (enumAccess.import) {
+              const enumMatch = enumAccess.import.match(/^import\s*\{\s*([^}]+)\s*\}\s*from\s*["']([^"']+)["'];?$/);
+              if (enumMatch) {
+                const [, symbol, rawModulePath] = enumMatch;
+                importManager.addNamedImport(rawModulePath, symbol.trim());
+              } else {
+                importManager.addLiteralImport(enumAccess.import);
+              }
+            }
+            fields.push(`  ${fieldName}: ${enumAccess.value},`);
+            fieldDefinitions[fieldName] = enumAccess.value;
+            continue;
+          }
+          let fragmentToSearch = null;
+          let nestedFragmentPath = null;
+          if (fieldToFragmentMap[gqlFieldName]) {
+            const hintedFragmentName = toPascalCase(fieldToFragmentMap[gqlFieldName]);
+            const hintedPath = import_fast_glob2.default.sync(
+              `src/**/*/${toKebabCase(hintedFragmentName)}.fragment.gql`
+            )[0];
+            if (hintedPath) {
+              try {
+                const fragmentTypeCondition = getFragmentTypeCondition(hintedPath);
+                if (fragmentTypeCondition === baseType.name) {
+                  fragmentToSearch = hintedFragmentName;
+                  nestedFragmentPath = hintedPath;
+                }
+              } catch {
+              }
+            }
+          }
+          if (!nestedFragmentPath) {
+            fragmentToSearch = toPascalCase(baseType.name);
+            nestedFragmentPath = import_fast_glob2.default.sync(
+              `src/**/*/${toKebabCase(fragmentToSearch)}.fragment.gql`
+            )[0];
+          }
+          if (!nestedFragmentPath) {
+            fieldDefinitions[fieldName] = "__KEEP_EXISTING__";
+            continue;
+          }
+          const nestedFragmentName = extractFragmentName(nestedFragmentPath);
+          const nestedFactoryName = `createMock${toPascalCase(nestedFragmentName)}`;
+          const nestedFactoryPath = nestedFragmentPath.replace(
+            ".fragment.gql",
+            ".factory.ts"
+          );
+          await generateFactory(nestedFragmentPath);
+          importManager.addNamedImport(nestedFactoryPath, nestedFactoryName);
+          const factoryCall = isListTypeDeep(gqlField.type) ? `[${nestedFactoryName}()]` : `${nestedFactoryName}()`;
+          fields.push(`  ${fieldName}: ${factoryCall},`);
+          fieldDefinitions[fieldName] = factoryCall;
+        } else if (selection.kind === "InlineFragment") {
+          await processSelections(selection.selectionSet.selections, level + 1);
+        } else if (selection.kind === "FragmentSpread") {
+          const spreadName = selection.name.value;
+          topLevelSpreads.add(spreadName);
+        }
       }
-      if (isScalar(baseType)) {
-        const mockValue = getFakerMockForScalar(baseType.name, fieldName);
-        const line = isListTypeDeep(gqlField.type) ? `  ${fieldName}: [${mockValue}],` : `  ${fieldName}: ${mockValue},`;
-        fields.push(line);
-        fieldDefinitions[fieldName] = isListTypeDeep(gqlField.type) ? `[${mockValue}]` : mockValue;
-        continue;
-      }
-      if (isEnum(baseType)) {
-        const enumAccess = resolveEnumAccess(baseType.name, fragmentDir);
-        if (enumAccess.import) nestedImports.push(enumAccess.import);
-        fields.push(`  ${fieldName}: ${enumAccess.value},`);
-        fieldDefinitions[fieldName] = enumAccess.value;
-        continue;
-      }
-      const fragmentToSearch = toPascalCase(
-        fieldToFragmentMap[fieldName] || baseType.name
-      );
-      const nestedFragmentPath = import_fast_glob2.default.sync(
-        `src/**/*/${toKebabCase(fragmentToSearch)}.fragment.gql`
-      )[0];
-      if (!nestedFragmentPath) continue;
-      const nestedFragmentName = extractFragmentName(nestedFragmentPath);
-      const nestedFactoryName = `createMock${toPascalCase(nestedFragmentName)}`;
-      const nestedFactoryPath = nestedFragmentPath.replace(
-        ".fragment.gql",
-        ".factory.ts"
-      );
-      if (!import_fs2.default.existsSync(nestedFactoryPath)) {
-        await generateFactory(nestedFragmentPath);
-      }
-      const relPath = toRelativeImport(fragmentDir, nestedFactoryPath);
-      nestedImports.push(`import { ${nestedFactoryName} } from "${relPath}";`);
-      const factoryCall = isListTypeDeep(gqlField.type) ? `[${nestedFactoryName}()]` : `${nestedFactoryName}()`;
-      fields.push(`  ${fieldName}: ${factoryCall},`);
-      fieldDefinitions[fieldName] = factoryCall;
-    }
+    };
+    await processSelections(fragment.selectionSet.selections);
     for (const spread of topLevelSpreads) {
       const spreadFactory = `createMock${spread}`;
       const match = import_fast_glob2.default.sync(
         `src/gql/**/${toKebabCase(spread)}.factory.ts`
       )[0];
       if (!match) continue;
-      const relPath = toRelativeImport(fragmentDir, match);
-      nestedImports.push(`import { ${spreadFactory} } from "${relPath}";`);
+      importManager.addNamedImport(match, spreadFactory);
       fields.unshift(`  ...${spreadFactory}(),`);
     }
     fields.push(`  __typename: "${type.name}",`);
@@ -292432,7 +292714,12 @@ var generateFactory = async (fragmentPath) => {
       continue;
     }
     if (requiresUpdate && diff) {
-      const wasUpdated = updateManualFactory(factoryFilePath, diff, fieldDefinitions);
+      const wasUpdated = updateManualFactory(
+        factoryFilePath,
+        diff,
+        fieldDefinitions,
+        { mergedImports: importManager.buildMergedImports() }
+      );
       if (wasUpdated) {
         markFactoryAsGenerated(filePath, factoryFilePath, schemaContent2);
       }
@@ -292440,7 +292727,7 @@ var generateFactory = async (fragmentPath) => {
     }
     const fileContent = [
       ...imports,
-      ...nestedImports,
+      ...importManager.buildMergedImports(),
       "",
       `const ${defaultObjectName}: ${typeName} = {`,
       ...fields,
