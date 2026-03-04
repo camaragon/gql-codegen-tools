@@ -577,7 +577,7 @@ export const updateManualFactory = (
   const constMatch = factoryContent.match(/const\s+(\w+):\s*(\w+)\s*=\s*\{/);
   if (!constMatch) {
     console.warn(`Could not find default object in ${factoryPath}, skipping update`);
-    return;
+    return false;
   }
 
   const objectName = constMatch[1];
@@ -599,7 +599,7 @@ export const updateManualFactory = (
   
   if (braceCount !== 0) {
     console.warn(`Could not find matching brace in ${factoryPath}, skipping update`);
-    return;
+    return false;
   }
   
   const objectBody = factoryContent.substring(startIndex + 1, endIndex);
