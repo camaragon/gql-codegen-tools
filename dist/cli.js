@@ -8956,7 +8956,7 @@ var require_visitor = __commonJS({
     exports2.BREAK = void 0;
     exports2.getEnterLeaveForKind = getEnterLeaveForKind;
     exports2.getVisitFn = getVisitFn;
-    exports2.visit = visit2;
+    exports2.visit = visit;
     exports2.visitInParallel = visitInParallel;
     var _devAssert = require_devAssert();
     var _inspect = require_inspect();
@@ -8964,7 +8964,7 @@ var require_visitor = __commonJS({
     var _kinds = require_kinds();
     var BREAK = Object.freeze({});
     exports2.BREAK = BREAK;
-    function visit2(root, visitor, visitorKeys = _ast.QueryDocumentKeys) {
+    function visit(root, visitor, visitorKeys = _ast.QueryDocumentKeys) {
       const enterLeaveMap = /* @__PURE__ */ new Map();
       for (const kind of Object.values(_kinds.Kind)) {
         enterLeaveMap.set(kind, getEnterLeaveForKind(visitor, kind));
@@ -10343,42 +10343,42 @@ var require_typeComparators = __commonJS({
       }
       return false;
     }
-    function isTypeSubTypeOf(schema2, maybeSubType, superType) {
+    function isTypeSubTypeOf(schema, maybeSubType, superType) {
       if (maybeSubType === superType) {
         return true;
       }
       if ((0, _definition.isNonNullType)(superType)) {
         if ((0, _definition.isNonNullType)(maybeSubType)) {
-          return isTypeSubTypeOf(schema2, maybeSubType.ofType, superType.ofType);
+          return isTypeSubTypeOf(schema, maybeSubType.ofType, superType.ofType);
         }
         return false;
       }
       if ((0, _definition.isNonNullType)(maybeSubType)) {
-        return isTypeSubTypeOf(schema2, maybeSubType.ofType, superType);
+        return isTypeSubTypeOf(schema, maybeSubType.ofType, superType);
       }
       if ((0, _definition.isListType)(superType)) {
         if ((0, _definition.isListType)(maybeSubType)) {
-          return isTypeSubTypeOf(schema2, maybeSubType.ofType, superType.ofType);
+          return isTypeSubTypeOf(schema, maybeSubType.ofType, superType.ofType);
         }
         return false;
       }
       if ((0, _definition.isListType)(maybeSubType)) {
         return false;
       }
-      return (0, _definition.isAbstractType)(superType) && ((0, _definition.isInterfaceType)(maybeSubType) || (0, _definition.isObjectType)(maybeSubType)) && schema2.isSubType(superType, maybeSubType);
+      return (0, _definition.isAbstractType)(superType) && ((0, _definition.isInterfaceType)(maybeSubType) || (0, _definition.isObjectType)(maybeSubType)) && schema.isSubType(superType, maybeSubType);
     }
-    function doTypesOverlap(schema2, typeA, typeB) {
+    function doTypesOverlap(schema, typeA, typeB) {
       if (typeA === typeB) {
         return true;
       }
       if ((0, _definition.isAbstractType)(typeA)) {
         if ((0, _definition.isAbstractType)(typeB)) {
-          return schema2.getPossibleTypes(typeA).some((type) => schema2.isSubType(typeB, type));
+          return schema.getPossibleTypes(typeA).some((type) => schema.isSubType(typeB, type));
         }
-        return schema2.isSubType(typeA, typeB);
+        return schema.isSubType(typeA, typeB);
       }
       if ((0, _definition.isAbstractType)(typeB)) {
-        return schema2.isSubType(typeB, typeA);
+        return schema.isSubType(typeB, typeA);
       }
       return false;
     }
@@ -10984,31 +10984,31 @@ var require_introspection = __commonJS({
       fields: () => ({
         description: {
           type: _scalars.GraphQLString,
-          resolve: (schema2) => schema2.description
+          resolve: (schema) => schema.description
         },
         types: {
           description: "A list of all types supported by this server.",
           type: new _definition.GraphQLNonNull(
             new _definition.GraphQLList(new _definition.GraphQLNonNull(__Type))
           ),
-          resolve(schema2) {
-            return Object.values(schema2.getTypeMap());
+          resolve(schema) {
+            return Object.values(schema.getTypeMap());
           }
         },
         queryType: {
           description: "The type that query operations will be rooted at.",
           type: new _definition.GraphQLNonNull(__Type),
-          resolve: (schema2) => schema2.getQueryType()
+          resolve: (schema) => schema.getQueryType()
         },
         mutationType: {
           description: "If this server supports mutation, the type that mutation operations will be rooted at.",
           type: __Type,
-          resolve: (schema2) => schema2.getMutationType()
+          resolve: (schema) => schema.getMutationType()
         },
         subscriptionType: {
           description: "If this server support subscription, the type that subscription operations will be rooted at.",
           type: __Type,
-          resolve: (schema2) => schema2.getSubscriptionType()
+          resolve: (schema) => schema.getSubscriptionType()
         },
         directives: {
           description: "A list of all directives supported by this server.",
@@ -11017,7 +11017,7 @@ var require_introspection = __commonJS({
               new _definition.GraphQLNonNull(__Directive)
             )
           ),
-          resolve: (schema2) => schema2.getDirectives()
+          resolve: (schema) => schema.getDirectives()
         }
       })
     });
@@ -11227,9 +11227,9 @@ var require_introspection = __commonJS({
         },
         possibleTypes: {
           type: new _definition.GraphQLList(new _definition.GraphQLNonNull(__Type)),
-          resolve(type, _args, _context, { schema: schema2 }) {
+          resolve(type, _args, _context, { schema }) {
             if ((0, _definition.isAbstractType)(type)) {
-              return schema2.getPossibleTypes(type);
+              return schema.getPossibleTypes(type);
             }
           }
         },
@@ -11440,7 +11440,7 @@ var require_introspection = __commonJS({
       type: new _definition.GraphQLNonNull(__Schema),
       description: "Access the current type schema of this server.",
       args: [],
-      resolve: (_source, _args, _context, { schema: schema2 }) => schema2,
+      resolve: (_source, _args, _context, { schema }) => schema,
       deprecationReason: void 0,
       extensions: /* @__PURE__ */ Object.create(null),
       astNode: void 0
@@ -11461,7 +11461,7 @@ var require_introspection = __commonJS({
           astNode: void 0
         }
       ],
-      resolve: (_source, { name }, _context, { schema: schema2 }) => schema2.getType(name),
+      resolve: (_source, { name }, _context, { schema }) => schema.getType(name),
       deprecationReason: void 0,
       extensions: /* @__PURE__ */ Object.create(null),
       astNode: void 0
@@ -11514,16 +11514,16 @@ var require_schema = __commonJS({
     var _definition = require_definition();
     var _directives = require_directives();
     var _introspection = require_introspection();
-    function isSchema(schema2) {
-      return (0, _instanceOf.instanceOf)(schema2, GraphQLSchema);
+    function isSchema(schema) {
+      return (0, _instanceOf.instanceOf)(schema, GraphQLSchema);
     }
-    function assertSchema(schema2) {
-      if (!isSchema(schema2)) {
+    function assertSchema(schema) {
+      if (!isSchema(schema)) {
         throw new Error(
-          `Expected ${(0, _inspect.inspect)(schema2)} to be a GraphQL schema.`
+          `Expected ${(0, _inspect.inspect)(schema)} to be a GraphQL schema.`
         );
       }
-      return schema2;
+      return schema;
     }
     var GraphQLSchema = class {
       // Used as a cache for validateSchema().
@@ -11747,29 +11747,29 @@ var require_validate = __commonJS({
     var _directives = require_directives();
     var _introspection = require_introspection();
     var _schema = require_schema();
-    function validateSchema(schema2) {
-      (0, _schema.assertSchema)(schema2);
-      if (schema2.__validationErrors) {
-        return schema2.__validationErrors;
+    function validateSchema(schema) {
+      (0, _schema.assertSchema)(schema);
+      if (schema.__validationErrors) {
+        return schema.__validationErrors;
       }
-      const context = new SchemaValidationContext(schema2);
+      const context = new SchemaValidationContext(schema);
       validateRootTypes(context);
       validateDirectives(context);
       validateTypes(context);
       const errors = context.getErrors();
-      schema2.__validationErrors = errors;
+      schema.__validationErrors = errors;
       return errors;
     }
-    function assertValidSchema(schema2) {
-      const errors = validateSchema(schema2);
+    function assertValidSchema(schema) {
+      const errors = validateSchema(schema);
       if (errors.length !== 0) {
         throw new Error(errors.map((error) => error.message).join("\n\n"));
       }
     }
     var SchemaValidationContext = class {
-      constructor(schema2) {
+      constructor(schema) {
         this._errors = [];
-        this.schema = schema2;
+        this.schema = schema;
       }
       reportError(message, nodes) {
         const _nodes = Array.isArray(nodes) ? nodes.filter(Boolean) : nodes;
@@ -11784,46 +11784,46 @@ var require_validate = __commonJS({
       }
     };
     function validateRootTypes(context) {
-      const schema2 = context.schema;
-      const queryType = schema2.getQueryType();
+      const schema = context.schema;
+      const queryType = schema.getQueryType();
       if (!queryType) {
-        context.reportError("Query root type must be provided.", schema2.astNode);
+        context.reportError("Query root type must be provided.", schema.astNode);
       } else if (!(0, _definition.isObjectType)(queryType)) {
         var _getOperationTypeNode;
         context.reportError(
           `Query root type must be Object type, it cannot be ${(0, _inspect.inspect)(queryType)}.`,
           (_getOperationTypeNode = getOperationTypeNode(
-            schema2,
+            schema,
             _ast.OperationTypeNode.QUERY
           )) !== null && _getOperationTypeNode !== void 0 ? _getOperationTypeNode : queryType.astNode
         );
       }
-      const mutationType = schema2.getMutationType();
+      const mutationType = schema.getMutationType();
       if (mutationType && !(0, _definition.isObjectType)(mutationType)) {
         var _getOperationTypeNode2;
         context.reportError(
           `Mutation root type must be Object type if provided, it cannot be ${(0, _inspect.inspect)(mutationType)}.`,
           (_getOperationTypeNode2 = getOperationTypeNode(
-            schema2,
+            schema,
             _ast.OperationTypeNode.MUTATION
           )) !== null && _getOperationTypeNode2 !== void 0 ? _getOperationTypeNode2 : mutationType.astNode
         );
       }
-      const subscriptionType = schema2.getSubscriptionType();
+      const subscriptionType = schema.getSubscriptionType();
       if (subscriptionType && !(0, _definition.isObjectType)(subscriptionType)) {
         var _getOperationTypeNode3;
         context.reportError(
           `Subscription root type must be Object type if provided, it cannot be ${(0, _inspect.inspect)(subscriptionType)}.`,
           (_getOperationTypeNode3 = getOperationTypeNode(
-            schema2,
+            schema,
             _ast.OperationTypeNode.SUBSCRIPTION
           )) !== null && _getOperationTypeNode3 !== void 0 ? _getOperationTypeNode3 : subscriptionType.astNode
         );
       }
     }
-    function getOperationTypeNode(schema2, operation) {
+    function getOperationTypeNode(schema, operation) {
       var _flatMap$find;
-      return (_flatMap$find = [schema2.astNode, ...schema2.extensionASTNodes].flatMap(
+      return (_flatMap$find = [schema.astNode, ...schema.extensionASTNodes].flatMap(
         // FIXME: https://github.com/graphql/graphql-js/issues/2203
         (schemaNode) => {
           var _schemaNode$operation;
@@ -12212,18 +12212,18 @@ var require_typeFromAST = __commonJS({
     exports2.typeFromAST = typeFromAST;
     var _kinds = require_kinds();
     var _definition = require_definition();
-    function typeFromAST(schema2, typeNode) {
+    function typeFromAST(schema, typeNode) {
       switch (typeNode.kind) {
         case _kinds.Kind.LIST_TYPE: {
-          const innerType = typeFromAST(schema2, typeNode.type);
+          const innerType = typeFromAST(schema, typeNode.type);
           return innerType && new _definition.GraphQLList(innerType);
         }
         case _kinds.Kind.NON_NULL_TYPE: {
-          const innerType = typeFromAST(schema2, typeNode.type);
+          const innerType = typeFromAST(schema, typeNode.type);
           return innerType && new _definition.GraphQLNonNull(innerType);
         }
         case _kinds.Kind.NAMED_TYPE:
-          return schema2.getType(typeNode.name.value);
+          return schema.getType(typeNode.name.value);
       }
     }
   }
@@ -12237,16 +12237,16 @@ var require_TypeInfo = __commonJS({
       value: true
     });
     exports2.TypeInfo = void 0;
-    exports2.visitWithTypeInfo = visitWithTypeInfo2;
+    exports2.visitWithTypeInfo = visitWithTypeInfo;
     var _ast = require_ast();
     var _kinds = require_kinds();
     var _visitor = require_visitor();
     var _definition = require_definition();
     var _introspection = require_introspection();
     var _typeFromAST = require_typeFromAST();
-    var TypeInfo2 = class {
-      constructor(schema2, initialType, getFieldDefFn) {
-        this._schema = schema2;
+    var TypeInfo = class {
+      constructor(schema, initialType, getFieldDefFn) {
+        this._schema = schema;
         this._typeStack = [];
         this._parentTypeStack = [];
         this._inputTypeStack = [];
@@ -12311,7 +12311,7 @@ var require_TypeInfo = __commonJS({
         return this._enumValue;
       }
       enter(node) {
-        const schema2 = this._schema;
+        const schema = this._schema;
         switch (node.kind) {
           case _kinds.Kind.SELECTION_SET: {
             const namedType = (0, _definition.getNamedType)(this.getType());
@@ -12325,7 +12325,7 @@ var require_TypeInfo = __commonJS({
             let fieldDef;
             let fieldType;
             if (parentType) {
-              fieldDef = this._getFieldDef(schema2, parentType, node);
+              fieldDef = this._getFieldDef(schema, parentType, node);
               if (fieldDef) {
                 fieldType = fieldDef.type;
               }
@@ -12337,10 +12337,10 @@ var require_TypeInfo = __commonJS({
             break;
           }
           case _kinds.Kind.DIRECTIVE:
-            this._directive = schema2.getDirective(node.name.value);
+            this._directive = schema.getDirective(node.name.value);
             break;
           case _kinds.Kind.OPERATION_DEFINITION: {
-            const rootType = schema2.getRootType(node.operation);
+            const rootType = schema.getRootType(node.operation);
             this._typeStack.push(
               (0, _definition.isObjectType)(rootType) ? rootType : void 0
             );
@@ -12349,14 +12349,14 @@ var require_TypeInfo = __commonJS({
           case _kinds.Kind.INLINE_FRAGMENT:
           case _kinds.Kind.FRAGMENT_DEFINITION: {
             const typeConditionAST = node.typeCondition;
-            const outputType = typeConditionAST ? (0, _typeFromAST.typeFromAST)(schema2, typeConditionAST) : (0, _definition.getNamedType)(this.getType());
+            const outputType = typeConditionAST ? (0, _typeFromAST.typeFromAST)(schema, typeConditionAST) : (0, _definition.getNamedType)(this.getType());
             this._typeStack.push(
               (0, _definition.isOutputType)(outputType) ? outputType : void 0
             );
             break;
           }
           case _kinds.Kind.VARIABLE_DEFINITION: {
-            const inputType = (0, _typeFromAST.typeFromAST)(schema2, node.type);
+            const inputType = (0, _typeFromAST.typeFromAST)(schema, node.type);
             this._inputTypeStack.push(
               (0, _definition.isInputType)(inputType) ? inputType : void 0
             );
@@ -12458,13 +12458,13 @@ var require_TypeInfo = __commonJS({
         }
       }
     };
-    exports2.TypeInfo = TypeInfo2;
-    function getFieldDef(schema2, parentType, fieldNode) {
+    exports2.TypeInfo = TypeInfo;
+    function getFieldDef(schema, parentType, fieldNode) {
       const name = fieldNode.name.value;
-      if (name === _introspection.SchemaMetaFieldDef.name && schema2.getQueryType() === parentType) {
+      if (name === _introspection.SchemaMetaFieldDef.name && schema.getQueryType() === parentType) {
         return _introspection.SchemaMetaFieldDef;
       }
-      if (name === _introspection.TypeMetaFieldDef.name && schema2.getQueryType() === parentType) {
+      if (name === _introspection.TypeMetaFieldDef.name && schema.getQueryType() === parentType) {
         return _introspection.TypeMetaFieldDef;
       }
       if (name === _introspection.TypeNameMetaFieldDef.name && (0, _definition.isCompositeType)(parentType)) {
@@ -12474,7 +12474,7 @@ var require_TypeInfo = __commonJS({
         return parentType.getFields()[name];
       }
     }
-    function visitWithTypeInfo2(typeInfo, visitor) {
+    function visitWithTypeInfo(typeInfo, visitor) {
       return {
         enter(...args) {
           const node = args[0];
@@ -12611,11 +12611,11 @@ var require_FieldsOnCorrectTypeRule = __commonJS({
           if (type) {
             const fieldDef = context.getFieldDef();
             if (!fieldDef) {
-              const schema2 = context.getSchema();
+              const schema = context.getSchema();
               const fieldName = node.name.value;
               let suggestion = (0, _didYouMean.didYouMean)(
                 "to use an inline fragment on",
-                getSuggestedTypeNames(schema2, type, fieldName)
+                getSuggestedTypeNames(schema, type, fieldName)
               );
               if (suggestion === "") {
                 suggestion = (0, _didYouMean.didYouMean)(
@@ -12635,13 +12635,13 @@ var require_FieldsOnCorrectTypeRule = __commonJS({
         }
       };
     }
-    function getSuggestedTypeNames(schema2, type, fieldName) {
+    function getSuggestedTypeNames(schema, type, fieldName) {
       if (!(0, _definition.isAbstractType)(type)) {
         return [];
       }
       const suggestedTypes = /* @__PURE__ */ new Set();
       const usageCount = /* @__PURE__ */ Object.create(null);
-      for (const possibleType of schema2.getPossibleTypes(type)) {
+      for (const possibleType of schema.getPossibleTypes(type)) {
         if (!possibleType.getFields()[fieldName]) {
           continue;
         }
@@ -12661,10 +12661,10 @@ var require_FieldsOnCorrectTypeRule = __commonJS({
         if (usageCountDiff !== 0) {
           return usageCountDiff;
         }
-        if ((0, _definition.isInterfaceType)(typeA) && schema2.isSubType(typeA, typeB)) {
+        if ((0, _definition.isInterfaceType)(typeA) && schema.isSubType(typeA, typeB)) {
           return -1;
         }
-        if ((0, _definition.isInterfaceType)(typeB) && schema2.isSubType(typeB, typeA)) {
+        if ((0, _definition.isInterfaceType)(typeB) && schema.isSubType(typeB, typeA)) {
           return 1;
         }
         return (0, _naturalCompare.naturalCompare)(typeA.name, typeB.name);
@@ -12779,8 +12779,8 @@ var require_KnownArgumentNamesRule = __commonJS({
     }
     function KnownArgumentNamesOnDirectivesRule(context) {
       const directiveArgs = /* @__PURE__ */ Object.create(null);
-      const schema2 = context.getSchema();
-      const definedDirectives = schema2 ? schema2.getDirectives() : _directives.specifiedDirectives;
+      const schema = context.getSchema();
+      const definedDirectives = schema ? schema.getDirectives() : _directives.specifiedDirectives;
       for (const directive of definedDirectives) {
         directiveArgs[directive.name] = directive.args.map((arg) => arg.name);
       }
@@ -12839,8 +12839,8 @@ var require_KnownDirectivesRule = __commonJS({
     var _directives = require_directives();
     function KnownDirectivesRule(context) {
       const locationsMap = /* @__PURE__ */ Object.create(null);
-      const schema2 = context.getSchema();
-      const definedDirectives = schema2 ? schema2.getDirectives() : _directives.specifiedDirectives;
+      const schema = context.getSchema();
+      const definedDirectives = schema ? schema.getDirectives() : _directives.specifiedDirectives;
       for (const directive of definedDirectives) {
         locationsMap[directive.name] = directive.locations;
       }
@@ -12989,8 +12989,8 @@ var require_KnownTypeNamesRule = __commonJS({
     var _introspection = require_introspection();
     var _scalars = require_scalars();
     function KnownTypeNamesRule(context) {
-      const schema2 = context.getSchema();
-      const existingTypesMap = schema2 ? schema2.getTypeMap() : /* @__PURE__ */ Object.create(null);
+      const schema = context.getSchema();
+      const existingTypesMap = schema ? schema.getTypeMap() : /* @__PURE__ */ Object.create(null);
       const definedTypes = /* @__PURE__ */ Object.create(null);
       for (const def of context.getDocument().definitions) {
         if ((0, _predicates.isTypeDefinitionNode)(def)) {
@@ -14035,7 +14035,7 @@ var require_PossibleTypeExtensionsRule = __commonJS({
     var _predicates = require_predicates();
     var _definition = require_definition();
     function PossibleTypeExtensionsRule(context) {
-      const schema2 = context.getSchema();
+      const schema = context.getSchema();
       const definedTypes = /* @__PURE__ */ Object.create(null);
       for (const def of context.getDocument().definitions) {
         if ((0, _predicates.isTypeDefinitionNode)(def)) {
@@ -14053,7 +14053,7 @@ var require_PossibleTypeExtensionsRule = __commonJS({
       function checkExtension(node) {
         const typeName = node.name.value;
         const defNode = definedTypes[typeName];
-        const existingType = schema2 === null || schema2 === void 0 ? void 0 : schema2.getType(typeName);
+        const existingType = schema === null || schema === void 0 ? void 0 : schema.getType(typeName);
         let expectedKind;
         if (defNode) {
           expectedKind = defKindToExtKind[defNode.kind];
@@ -14075,7 +14075,7 @@ var require_PossibleTypeExtensionsRule = __commonJS({
         } else {
           const allTypeNames = Object.keys({
             ...definedTypes,
-            ...schema2 === null || schema2 === void 0 ? void 0 : schema2.getTypeMap()
+            ...schema === null || schema === void 0 ? void 0 : schema.getTypeMap()
           });
           const suggestedTypes = (0, _suggestionList.suggestionList)(
             typeName,
@@ -14203,8 +14203,8 @@ var require_ProvidedRequiredArgumentsRule = __commonJS({
     function ProvidedRequiredArgumentsOnDirectivesRule(context) {
       var _schema$getDirectives;
       const requiredArgsMap = /* @__PURE__ */ Object.create(null);
-      const schema2 = context.getSchema();
-      const definedDirectives = (_schema$getDirectives = schema2 === null || schema2 === void 0 ? void 0 : schema2.getDirectives()) !== null && _schema$getDirectives !== void 0 ? _schema$getDirectives : _directives.specifiedDirectives;
+      const schema = context.getSchema();
+      const definedDirectives = (_schema$getDirectives = schema === null || schema === void 0 ? void 0 : schema.getDirectives()) !== null && _schema$getDirectives !== void 0 ? _schema$getDirectives : _directives.specifiedDirectives;
       for (const directive of definedDirectives) {
         requiredArgsMap[directive.name] = (0, _keyMap.keyMap)(
           directive.args.filter(_definition.isRequiredArgument),
@@ -14673,12 +14673,12 @@ var require_values = __commonJS({
     var _coerceInputValue = require_coerceInputValue();
     var _typeFromAST = require_typeFromAST();
     var _valueFromAST = require_valueFromAST();
-    function getVariableValues(schema2, varDefNodes, inputs, options) {
+    function getVariableValues(schema, varDefNodes, inputs, options) {
       const errors = [];
       const maxErrors = options === null || options === void 0 ? void 0 : options.maxErrors;
       try {
         const coerced = coerceVariableValues(
-          schema2,
+          schema,
           varDefNodes,
           inputs,
           (error) => {
@@ -14702,11 +14702,11 @@ var require_values = __commonJS({
         errors
       };
     }
-    function coerceVariableValues(schema2, varDefNodes, inputs, onError) {
+    function coerceVariableValues(schema, varDefNodes, inputs, onError) {
       const coercedValues = {};
       for (const varDefNode of varDefNodes) {
         const varName = varDefNode.variable.name.value;
-        const varType = (0, _typeFromAST.typeFromAST)(schema2, varDefNode.type);
+        const varType = (0, _typeFromAST.typeFromAST)(schema, varDefNode.type);
         if (!(0, _definition.isInputType)(varType)) {
           const varTypeStr = (0, _printer.print)(varDefNode.type);
           onError(
@@ -14878,10 +14878,10 @@ var require_collectFields = __commonJS({
     var _directives = require_directives();
     var _typeFromAST = require_typeFromAST();
     var _values = require_values();
-    function collectFields(schema2, fragments, variableValues, runtimeType, selectionSet) {
+    function collectFields(schema, fragments, variableValues, runtimeType, selectionSet) {
       const fields = /* @__PURE__ */ new Map();
       collectFieldsImpl(
-        schema2,
+        schema,
         fragments,
         variableValues,
         runtimeType,
@@ -14891,13 +14891,13 @@ var require_collectFields = __commonJS({
       );
       return fields;
     }
-    function collectSubfields(schema2, fragments, variableValues, returnType, fieldNodes) {
+    function collectSubfields(schema, fragments, variableValues, returnType, fieldNodes) {
       const subFieldNodes = /* @__PURE__ */ new Map();
       const visitedFragmentNames = /* @__PURE__ */ new Set();
       for (const node of fieldNodes) {
         if (node.selectionSet) {
           collectFieldsImpl(
-            schema2,
+            schema,
             fragments,
             variableValues,
             returnType,
@@ -14909,7 +14909,7 @@ var require_collectFields = __commonJS({
       }
       return subFieldNodes;
     }
-    function collectFieldsImpl(schema2, fragments, variableValues, runtimeType, selectionSet, fields, visitedFragmentNames) {
+    function collectFieldsImpl(schema, fragments, variableValues, runtimeType, selectionSet, fields, visitedFragmentNames) {
       for (const selection of selectionSet.selections) {
         switch (selection.kind) {
           case _kinds.Kind.FIELD: {
@@ -14926,11 +14926,11 @@ var require_collectFields = __commonJS({
             break;
           }
           case _kinds.Kind.INLINE_FRAGMENT: {
-            if (!shouldIncludeNode(variableValues, selection) || !doesFragmentConditionMatch(schema2, selection, runtimeType)) {
+            if (!shouldIncludeNode(variableValues, selection) || !doesFragmentConditionMatch(schema, selection, runtimeType)) {
               continue;
             }
             collectFieldsImpl(
-              schema2,
+              schema,
               fragments,
               variableValues,
               runtimeType,
@@ -14947,11 +14947,11 @@ var require_collectFields = __commonJS({
             }
             visitedFragmentNames.add(fragName);
             const fragment = fragments[fragName];
-            if (!fragment || !doesFragmentConditionMatch(schema2, fragment, runtimeType)) {
+            if (!fragment || !doesFragmentConditionMatch(schema, fragment, runtimeType)) {
               continue;
             }
             collectFieldsImpl(
-              schema2,
+              schema,
               fragments,
               variableValues,
               runtimeType,
@@ -14983,20 +14983,20 @@ var require_collectFields = __commonJS({
       }
       return true;
     }
-    function doesFragmentConditionMatch(schema2, fragment, type) {
+    function doesFragmentConditionMatch(schema, fragment, type) {
       const typeConditionNode = fragment.typeCondition;
       if (!typeConditionNode) {
         return true;
       }
       const conditionalType = (0, _typeFromAST.typeFromAST)(
-        schema2,
+        schema,
         typeConditionNode
       );
       if (conditionalType === type) {
         return true;
       }
       if ((0, _definition.isAbstractType)(conditionalType)) {
-        return schema2.isSubType(conditionalType, type);
+        return schema.isSubType(conditionalType, type);
       }
       return false;
     }
@@ -15021,8 +15021,8 @@ var require_SingleFieldSubscriptionsRule = __commonJS({
       return {
         OperationDefinition(node) {
           if (node.operation === "subscription") {
-            const schema2 = context.getSchema();
-            const subscriptionType = schema2.getSubscriptionType();
+            const schema = context.getSchema();
+            const subscriptionType = schema.getSubscriptionType();
             if (subscriptionType) {
               const operationName = node.name ? node.name.value : null;
               const variableValues = /* @__PURE__ */ Object.create(null);
@@ -15034,7 +15034,7 @@ var require_SingleFieldSubscriptionsRule = __commonJS({
                 }
               }
               const fields = (0, _collectFields.collectFields)(
-                schema2,
+                schema,
                 fragments,
                 variableValues,
                 subscriptionType,
@@ -15206,11 +15206,11 @@ var require_UniqueDirectiveNamesRule = __commonJS({
     var _GraphQLError = require_GraphQLError();
     function UniqueDirectiveNamesRule(context) {
       const knownDirectiveNames = /* @__PURE__ */ Object.create(null);
-      const schema2 = context.getSchema();
+      const schema = context.getSchema();
       return {
         DirectiveDefinition(node) {
           const directiveName = node.name.value;
-          if (schema2 !== null && schema2 !== void 0 && schema2.getDirective(directiveName)) {
+          if (schema !== null && schema !== void 0 && schema.getDirective(directiveName)) {
             context.reportError(
               new _GraphQLError.GraphQLError(
                 `Directive "@${directiveName}" already exists in the schema. It cannot be redefined.`,
@@ -15254,8 +15254,8 @@ var require_UniqueDirectivesPerLocationRule = __commonJS({
     var _directives = require_directives();
     function UniqueDirectivesPerLocationRule(context) {
       const uniqueDirectiveMap = /* @__PURE__ */ Object.create(null);
-      const schema2 = context.getSchema();
-      const definedDirectives = schema2 ? schema2.getDirectives() : _directives.specifiedDirectives;
+      const schema = context.getSchema();
+      const definedDirectives = schema ? schema.getDirectives() : _directives.specifiedDirectives;
       for (const directive of definedDirectives) {
         uniqueDirectiveMap[directive.name] = !directive.isRepeatable;
       }
@@ -15321,8 +15321,8 @@ var require_UniqueEnumValueNamesRule = __commonJS({
     var _GraphQLError = require_GraphQLError();
     var _definition = require_definition();
     function UniqueEnumValueNamesRule(context) {
-      const schema2 = context.getSchema();
-      const existingTypeMap = schema2 ? schema2.getTypeMap() : /* @__PURE__ */ Object.create(null);
+      const schema = context.getSchema();
+      const existingTypeMap = schema ? schema.getTypeMap() : /* @__PURE__ */ Object.create(null);
       const knownValueNames = /* @__PURE__ */ Object.create(null);
       return {
         EnumTypeDefinition: checkValueUniqueness,
@@ -15378,8 +15378,8 @@ var require_UniqueFieldDefinitionNamesRule = __commonJS({
     var _GraphQLError = require_GraphQLError();
     var _definition = require_definition();
     function UniqueFieldDefinitionNamesRule(context) {
-      const schema2 = context.getSchema();
-      const existingTypeMap = schema2 ? schema2.getTypeMap() : /* @__PURE__ */ Object.create(null);
+      const schema = context.getSchema();
+      const existingTypeMap = schema ? schema.getTypeMap() : /* @__PURE__ */ Object.create(null);
       const knownFieldNames = /* @__PURE__ */ Object.create(null);
       return {
         InputObjectTypeDefinition: checkFieldUniqueness,
@@ -15561,12 +15561,12 @@ var require_UniqueOperationTypesRule = __commonJS({
     exports2.UniqueOperationTypesRule = UniqueOperationTypesRule;
     var _GraphQLError = require_GraphQLError();
     function UniqueOperationTypesRule(context) {
-      const schema2 = context.getSchema();
+      const schema = context.getSchema();
       const definedOperationTypes = /* @__PURE__ */ Object.create(null);
-      const existingOperationTypes = schema2 ? {
-        query: schema2.getQueryType(),
-        mutation: schema2.getMutationType(),
-        subscription: schema2.getSubscriptionType()
+      const existingOperationTypes = schema ? {
+        query: schema.getQueryType(),
+        mutation: schema.getMutationType(),
+        subscription: schema.getSubscriptionType()
       } : {};
       return {
         SchemaDefinition: checkOperationTypes,
@@ -15617,7 +15617,7 @@ var require_UniqueTypeNamesRule = __commonJS({
     var _GraphQLError = require_GraphQLError();
     function UniqueTypeNamesRule(context) {
       const knownTypeNames = /* @__PURE__ */ Object.create(null);
-      const schema2 = context.getSchema();
+      const schema = context.getSchema();
       return {
         ScalarTypeDefinition: checkTypeName,
         ObjectTypeDefinition: checkTypeName,
@@ -15628,7 +15628,7 @@ var require_UniqueTypeNamesRule = __commonJS({
       };
       function checkTypeName(node) {
         const typeName = node.name.value;
-        if (schema2 !== null && schema2 !== void 0 && schema2.getType(typeName)) {
+        if (schema !== null && schema !== void 0 && schema.getType(typeName)) {
           context.reportError(
             new _GraphQLError.GraphQLError(
               `Type "${typeName}" already exists in the schema. It cannot also be defined in this type definition.`,
@@ -15976,10 +15976,10 @@ var require_VariablesInAllowedPositionRule = __commonJS({
               const varName = node.name.value;
               const varDef = varDefMap[varName];
               if (varDef && type) {
-                const schema2 = context.getSchema();
-                const varType = (0, _typeFromAST.typeFromAST)(schema2, varDef.type);
+                const schema = context.getSchema();
+                const varType = (0, _typeFromAST.typeFromAST)(schema, varDef.type);
                 if (varType && !allowedVariableUsage(
-                  schema2,
+                  schema,
                   varType,
                   varDef.defaultValue,
                   type,
@@ -16015,7 +16015,7 @@ var require_VariablesInAllowedPositionRule = __commonJS({
         }
       };
     }
-    function allowedVariableUsage(schema2, varType, varDefaultValue, locationType, locationDefaultValue) {
+    function allowedVariableUsage(schema, varType, varDefaultValue, locationType, locationDefaultValue) {
       if ((0, _definition.isNonNullType)(locationType) && !(0, _definition.isNonNullType)(varType)) {
         const hasNonNullVariableDefaultValue = varDefaultValue != null && varDefaultValue.kind !== _kinds.Kind.NULL;
         const hasLocationDefaultValue = locationDefaultValue !== void 0;
@@ -16024,12 +16024,12 @@ var require_VariablesInAllowedPositionRule = __commonJS({
         }
         const nullableLocationType = locationType.ofType;
         return (0, _typeComparators.isTypeSubTypeOf)(
-          schema2,
+          schema,
           varType,
           nullableLocationType
         );
       }
-      return (0, _typeComparators.isTypeSubTypeOf)(schema2, varType, locationType);
+      return (0, _typeComparators.isTypeSubTypeOf)(schema, varType, locationType);
     }
   }
 });
@@ -16221,9 +16221,9 @@ var require_ValidationContext = __commonJS({
     };
     exports2.ASTValidationContext = ASTValidationContext;
     var SDLValidationContext = class extends ASTValidationContext {
-      constructor(ast, schema2, onError) {
+      constructor(ast, schema, onError) {
         super(ast, onError);
-        this._schema = schema2;
+        this._schema = schema;
       }
       get [Symbol.toStringTag]() {
         return "SDLValidationContext";
@@ -16234,9 +16234,9 @@ var require_ValidationContext = __commonJS({
     };
     exports2.SDLValidationContext = SDLValidationContext;
     var ValidationContext = class extends ASTValidationContext {
-      constructor(schema2, ast, typeInfo, onError) {
+      constructor(schema, ast, typeInfo, onError) {
         super(ast, onError);
-        this._schema = schema2;
+        this._schema = schema;
         this._typeInfo = typeInfo;
         this._variableUsages = /* @__PURE__ */ new Map();
         this._recursiveVariableUsages = /* @__PURE__ */ new Map();
@@ -16329,15 +16329,15 @@ var require_validate2 = __commonJS({
     var _TypeInfo = require_TypeInfo();
     var _specifiedRules = require_specifiedRules();
     var _ValidationContext = require_ValidationContext();
-    function validate(schema2, documentAST, rules = _specifiedRules.specifiedRules, options, typeInfo = new _TypeInfo.TypeInfo(schema2)) {
+    function validate(schema, documentAST, rules = _specifiedRules.specifiedRules, options, typeInfo = new _TypeInfo.TypeInfo(schema)) {
       var _options$maxErrors;
       const maxErrors = (_options$maxErrors = options === null || options === void 0 ? void 0 : options.maxErrors) !== null && _options$maxErrors !== void 0 ? _options$maxErrors : 100;
       documentAST || (0, _devAssert.devAssert)(false, "Must provide document.");
-      (0, _validate.assertValidSchema)(schema2);
+      (0, _validate.assertValidSchema)(schema);
       const abortObj = Object.freeze({});
       const errors = [];
       const context = new _ValidationContext.ValidationContext(
-        schema2,
+        schema,
         documentAST,
         typeInfo,
         (error) => {
@@ -16386,8 +16386,8 @@ var require_validate2 = __commonJS({
         throw new Error(errors.map((error) => error.message).join("\n\n"));
       }
     }
-    function assertValidSDLExtension(documentAST, schema2) {
-      const errors = validateSDL(documentAST, schema2);
+    function assertValidSDLExtension(documentAST, schema) {
+      const errors = validateSDL(documentAST, schema);
       if (errors.length !== 0) {
         throw new Error(errors.map((error) => error.message).join("\n\n"));
       }
@@ -16568,8 +16568,8 @@ var require_execute = __commonJS({
         false,
         "graphql@16 dropped long-deprecated support for positional arguments, please pass an object instead."
       );
-      const { schema: schema2, document, variableValues, rootValue } = args;
-      assertValidExecutionArguments(schema2, document, variableValues);
+      const { schema, document, variableValues, rootValue } = args;
+      assertValidExecutionArguments(schema, document, variableValues);
       const exeContext = buildExecutionContext(args);
       if (!("schema" in exeContext)) {
         return {
@@ -16609,9 +16609,9 @@ var require_execute = __commonJS({
         data
       };
     }
-    function assertValidExecutionArguments(schema2, document, rawVariableValues) {
+    function assertValidExecutionArguments(schema, document, rawVariableValues) {
       document || (0, _devAssert.devAssert)(false, "Must provide document.");
-      (0, _validate.assertValidSchema)(schema2);
+      (0, _validate.assertValidSchema)(schema);
       rawVariableValues == null || (0, _isObjectLike.isObjectLike)(rawVariableValues) || (0, _devAssert.devAssert)(
         false,
         "Variables must be provided as an Object where each property is a variable value. Perhaps look to see if an unparsed JSON string was provided."
@@ -16620,7 +16620,7 @@ var require_execute = __commonJS({
     function buildExecutionContext(args) {
       var _definition$name, _operation$variableDe, _options$maxCoercionE;
       const {
-        schema: schema2,
+        schema,
         document,
         rootValue,
         contextValue,
@@ -16667,7 +16667,7 @@ var require_execute = __commonJS({
       }
       const variableDefinitions = (_operation$variableDe = operation.variableDefinitions) !== null && _operation$variableDe !== void 0 ? _operation$variableDe : [];
       const coercedVariableValues = (0, _values.getVariableValues)(
-        schema2,
+        schema,
         variableDefinitions,
         rawVariableValues !== null && rawVariableValues !== void 0 ? rawVariableValues : {},
         {
@@ -16678,7 +16678,7 @@ var require_execute = __commonJS({
         return coercedVariableValues.errors;
       }
       return {
-        schema: schema2,
+        schema,
         fragments,
         rootValue,
         contextValue,
@@ -17144,11 +17144,11 @@ var require_execute = __commonJS({
       }
     };
     exports2.defaultFieldResolver = defaultFieldResolver;
-    function getFieldDef(schema2, parentType, fieldNode) {
+    function getFieldDef(schema, parentType, fieldNode) {
       const fieldName = fieldNode.name.value;
-      if (fieldName === _introspection.SchemaMetaFieldDef.name && schema2.getQueryType() === parentType) {
+      if (fieldName === _introspection.SchemaMetaFieldDef.name && schema.getQueryType() === parentType) {
         return _introspection.SchemaMetaFieldDef;
-      } else if (fieldName === _introspection.TypeMetaFieldDef.name && schema2.getQueryType() === parentType) {
+      } else if (fieldName === _introspection.TypeMetaFieldDef.name && schema.getQueryType() === parentType) {
         return _introspection.TypeMetaFieldDef;
       } else if (fieldName === _introspection.TypeNameMetaFieldDef.name) {
         return _introspection.TypeNameMetaFieldDef;
@@ -17189,7 +17189,7 @@ var require_graphql = __commonJS({
         "graphql@16 dropped long-deprecated support for positional arguments, please pass an object instead."
       );
       const {
-        schema: schema2,
+        schema,
         source,
         rootValue,
         contextValue,
@@ -17198,7 +17198,7 @@ var require_graphql = __commonJS({
         fieldResolver,
         typeResolver
       } = args;
-      const schemaValidationErrors = (0, _validate.validateSchema)(schema2);
+      const schemaValidationErrors = (0, _validate.validateSchema)(schema);
       if (schemaValidationErrors.length > 0) {
         return {
           errors: schemaValidationErrors
@@ -17212,14 +17212,14 @@ var require_graphql = __commonJS({
           errors: [syntaxError]
         };
       }
-      const validationErrors = (0, _validate2.validate)(schema2, document);
+      const validationErrors = (0, _validate2.validate)(schema, document);
       if (validationErrors.length > 0) {
         return {
           errors: validationErrors
         };
       }
       return (0, _execute.execute)({
-        schema: schema2,
+        schema,
         document,
         rootValue,
         contextValue,
@@ -18110,8 +18110,8 @@ var require_subscribe = __commonJS({
     }
     async function createSourceEventStream(...rawArgs) {
       const args = toNormalizedArgs(rawArgs);
-      const { schema: schema2, document, variableValues } = args;
-      (0, _execute.assertValidExecutionArguments)(schema2, document, variableValues);
+      const { schema, document, variableValues } = args;
+      (0, _execute.assertValidExecutionArguments)(schema, document, variableValues);
       const exeContext = (0, _execute.buildExecutionContext)(args);
       if (!("schema" in exeContext)) {
         return {
@@ -18136,8 +18136,8 @@ var require_subscribe = __commonJS({
       }
     }
     async function executeSubscription(exeContext) {
-      const { schema: schema2, fragments, operation, variableValues, rootValue } = exeContext;
-      const rootType = schema2.getSubscriptionType();
+      const { schema, fragments, operation, variableValues, rootValue } = exeContext;
+      const rootType = schema.getSubscriptionType();
       if (rootType == null) {
         throw new _GraphQLError.GraphQLError(
           "Schema is not configured to execute subscription operation.",
@@ -18147,14 +18147,14 @@ var require_subscribe = __commonJS({
         );
       }
       const rootFields = (0, _collectFields.collectFields)(
-        schema2,
+        schema,
         fragments,
         variableValues,
         rootType,
         operation.selectionSet
       );
       const [responseName, fieldNodes] = [...rootFields.entries()][0];
-      const fieldDef = (0, _execute.getFieldDef)(schema2, rootType, fieldNodes[0]);
+      const fieldDef = (0, _execute.getFieldDef)(schema, rootType, fieldNodes[0]);
       if (!fieldDef) {
         const fieldName = fieldNodes[0].name.value;
         throw new _GraphQLError.GraphQLError(
@@ -18916,9 +18916,9 @@ var require_getOperationRootType = __commonJS({
     });
     exports2.getOperationRootType = getOperationRootType;
     var _GraphQLError = require_GraphQLError();
-    function getOperationRootType(schema2, operation) {
+    function getOperationRootType(schema, operation) {
       if (operation.operation === "query") {
-        const queryType = schema2.getQueryType();
+        const queryType = schema.getQueryType();
         if (!queryType) {
           throw new _GraphQLError.GraphQLError(
             "Schema does not define the required query root type.",
@@ -18930,7 +18930,7 @@ var require_getOperationRootType = __commonJS({
         return queryType;
       }
       if (operation.operation === "mutation") {
-        const mutationType = schema2.getMutationType();
+        const mutationType = schema.getMutationType();
         if (!mutationType) {
           throw new _GraphQLError.GraphQLError(
             "Schema is not configured for mutations.",
@@ -18942,7 +18942,7 @@ var require_getOperationRootType = __commonJS({
         return mutationType;
       }
       if (operation.operation === "subscription") {
-        const subscriptionType = schema2.getSubscriptionType();
+        const subscriptionType = schema.getSubscriptionType();
         if (!subscriptionType) {
           throw new _GraphQLError.GraphQLError(
             "Schema is not configured for subscriptions.",
@@ -18975,7 +18975,7 @@ var require_introspectionFromSchema = __commonJS({
     var _parser = require_parser();
     var _execute = require_execute();
     var _getIntrospectionQuery = require_getIntrospectionQuery();
-    function introspectionFromSchema(schema2, options) {
+    function introspectionFromSchema(schema, options) {
       const optionsWithDefaults = {
         specifiedByUrl: true,
         directiveIsRepeatable: true,
@@ -18988,7 +18988,7 @@ var require_introspectionFromSchema = __commonJS({
         (0, _getIntrospectionQuery.getIntrospectionQuery)(optionsWithDefaults)
       );
       const result = (0, _execute.executeSync)({
-        schema: schema2,
+        schema,
         document
       });
       !result.errors && result.data || (0, _invariant.invariant)(false);
@@ -19311,15 +19311,15 @@ var require_extendSchema = __commonJS({
     var _validate = require_validate2();
     var _values = require_values();
     var _valueFromAST = require_valueFromAST();
-    function extendSchema(schema2, documentAST, options) {
-      (0, _schema.assertSchema)(schema2);
+    function extendSchema(schema, documentAST, options) {
+      (0, _schema.assertSchema)(schema);
       documentAST != null && documentAST.kind === _kinds.Kind.DOCUMENT || (0, _devAssert.devAssert)(false, "Must provide valid Document AST.");
       if ((options === null || options === void 0 ? void 0 : options.assumeValid) !== true && (options === null || options === void 0 ? void 0 : options.assumeValidSDL) !== true) {
-        (0, _validate.assertValidSDLExtension)(documentAST, schema2);
+        (0, _validate.assertValidSDLExtension)(documentAST, schema);
       }
-      const schemaConfig = schema2.toConfig();
+      const schemaConfig = schema.toConfig();
       const extendedConfig = extendSchemaImpl(schemaConfig, documentAST, options);
-      return schemaConfig === extendedConfig ? schema2 : new _schema.GraphQLSchema(extendedConfig);
+      return schemaConfig === extendedConfig ? schema : new _schema.GraphQLSchema(extendedConfig);
     }
     function extendSchemaImpl(schemaConfig, documentAST, options) {
       var _schemaDef, _schemaDef$descriptio, _schemaDef2, _options$assumeValid;
@@ -19870,8 +19870,8 @@ var require_lexicographicSortSchema = __commonJS({
     var _directives = require_directives();
     var _introspection = require_introspection();
     var _schema = require_schema();
-    function lexicographicSortSchema(schema2) {
-      const schemaConfig = schema2.toConfig();
+    function lexicographicSortSchema(schema) {
+      const schemaConfig = schema.toConfig();
       const typeMap = (0, _keyValMap.keyValMap)(
         sortByName(schemaConfig.types),
         (type) => type.name,
@@ -20013,16 +20013,16 @@ var require_printSchema = __commonJS({
     var _introspection = require_introspection();
     var _scalars = require_scalars();
     var _astFromValue = require_astFromValue();
-    function printSchema(schema2) {
+    function printSchema(schema) {
       return printFilteredSchema(
-        schema2,
+        schema,
         (n2) => !(0, _directives.isSpecifiedDirective)(n2),
         isDefinedType
       );
     }
-    function printIntrospectionSchema(schema2) {
+    function printIntrospectionSchema(schema) {
       return printFilteredSchema(
-        schema2,
+        schema,
         _directives.isSpecifiedDirective,
         _introspection.isIntrospectionType
       );
@@ -20030,46 +20030,46 @@ var require_printSchema = __commonJS({
     function isDefinedType(type) {
       return !(0, _scalars.isSpecifiedScalarType)(type) && !(0, _introspection.isIntrospectionType)(type);
     }
-    function printFilteredSchema(schema2, directiveFilter, typeFilter) {
-      const directives = schema2.getDirectives().filter(directiveFilter);
-      const types = Object.values(schema2.getTypeMap()).filter(typeFilter);
+    function printFilteredSchema(schema, directiveFilter, typeFilter) {
+      const directives = schema.getDirectives().filter(directiveFilter);
+      const types = Object.values(schema.getTypeMap()).filter(typeFilter);
       return [
-        printSchemaDefinition(schema2),
+        printSchemaDefinition(schema),
         ...directives.map((directive) => printDirective(directive)),
         ...types.map((type) => printType(type))
       ].filter(Boolean).join("\n\n");
     }
-    function printSchemaDefinition(schema2) {
-      if (schema2.description == null && isSchemaOfCommonNames(schema2)) {
+    function printSchemaDefinition(schema) {
+      if (schema.description == null && isSchemaOfCommonNames(schema)) {
         return;
       }
       const operationTypes = [];
-      const queryType = schema2.getQueryType();
+      const queryType = schema.getQueryType();
       if (queryType) {
         operationTypes.push(`  query: ${queryType.name}`);
       }
-      const mutationType = schema2.getMutationType();
+      const mutationType = schema.getMutationType();
       if (mutationType) {
         operationTypes.push(`  mutation: ${mutationType.name}`);
       }
-      const subscriptionType = schema2.getSubscriptionType();
+      const subscriptionType = schema.getSubscriptionType();
       if (subscriptionType) {
         operationTypes.push(`  subscription: ${subscriptionType.name}`);
       }
-      return printDescription(schema2) + `schema {
+      return printDescription(schema) + `schema {
 ${operationTypes.join("\n")}
 }`;
     }
-    function isSchemaOfCommonNames(schema2) {
-      const queryType = schema2.getQueryType();
+    function isSchemaOfCommonNames(schema) {
+      const queryType = schema.getQueryType();
       if (queryType && queryType.name !== "Query") {
         return false;
       }
-      const mutationType = schema2.getMutationType();
+      const mutationType = schema.getMutationType();
       if (mutationType && mutationType.name !== "Mutation") {
         return false;
       }
-      const subscriptionType = schema2.getSubscriptionType();
+      const subscriptionType = schema.getSubscriptionType();
       if (subscriptionType && subscriptionType.name !== "Subscription") {
         return false;
       }
@@ -65426,7 +65426,7 @@ ${lanes.join("\n")}
         function findNearestNodeStartingBeforeOrAtPosition(sourceFile, position) {
           let bestResult = sourceFile;
           let lastNodeEntirelyBeforePosition;
-          forEachChild(sourceFile, visit2);
+          forEachChild(sourceFile, visit);
           if (lastNodeEntirelyBeforePosition) {
             const lastChildOfLastEntireNodeBeforePosition = getLastDescendant(lastNodeEntirelyBeforePosition);
             if (lastChildOfLastEntireNodeBeforePosition.pos > bestResult.pos) {
@@ -65444,7 +65444,7 @@ ${lanes.join("\n")}
               }
             }
           }
-          function visit2(child) {
+          function visit(child) {
             if (nodeIsMissing(child)) {
               return;
             }
@@ -65453,7 +65453,7 @@ ${lanes.join("\n")}
                 bestResult = child;
               }
               if (position < child.end) {
-                forEachChild(child, visit2);
+                forEachChild(child, visit);
                 return true;
               } else {
                 Debug.assert(child.end <= position);
@@ -80241,7 +80241,7 @@ ${lanes.join("\n")}
           let typeOnlyExportStarMap;
           const nonTypeOnlyNames = /* @__PURE__ */ new Set();
           moduleSymbol = resolveExternalModuleSymbol(moduleSymbol);
-          const exports22 = visit2(moduleSymbol) || emptySymbols;
+          const exports22 = visit(moduleSymbol) || emptySymbols;
           if (typeOnlyExportStarMap) {
             nonTypeOnlyNames.forEach((name) => typeOnlyExportStarMap.delete(name));
           }
@@ -80249,7 +80249,7 @@ ${lanes.join("\n")}
             exports: exports22,
             typeOnlyExportStarMap
           };
-          function visit2(symbol, exportStar, isTypeOnly) {
+          function visit(symbol, exportStar, isTypeOnly) {
             if (!isTypeOnly && (symbol == null ? void 0 : symbol.exports)) {
               symbol.exports.forEach((_3, name) => nonTypeOnlyNames.add(name));
             }
@@ -80267,7 +80267,7 @@ ${lanes.join("\n")}
               if (exportStars.declarations) {
                 for (const node of exportStars.declarations) {
                   const resolvedModule = resolveExternalModuleName(node, node.moduleSpecifier);
-                  const exportedSymbols = visit2(resolvedModule, node, isTypeOnly || node.isTypeOnly);
+                  const exportedSymbols = visit(resolvedModule, node, isTypeOnly || node.isTypeOnly);
                   extendExportSymbols(
                     nestedSymbols,
                     exportedSymbols,
@@ -115776,14 +115776,14 @@ ${lanes.join("\n")}
         }
         function isSymbolUsedInBinaryExpressionChain(node, testedSymbol) {
           while (isBinaryExpression(node) && node.operatorToken.kind === 56) {
-            const isUsed = forEachChild(node.right, function visit2(child) {
+            const isUsed = forEachChild(node.right, function visit(child) {
               if (isIdentifier(child)) {
                 const symbol = getSymbolAtLocation(child);
                 if (symbol && symbol === testedSymbol) {
                   return true;
                 }
               }
-              return forEachChild(child, visit2);
+              return forEachChild(child, visit);
             });
             if (isUsed) {
               return true;
@@ -116958,8 +116958,8 @@ ${lanes.join("\n")}
           }
         }
         function checkTypeParametersNotReferenced(root, typeParameters, index) {
-          visit2(root);
-          function visit2(node) {
+          visit(root);
+          function visit(node) {
             if (node.kind === 183) {
               const type = getTypeFromTypeReference(node);
               if (type.flags & 262144) {
@@ -116970,7 +116970,7 @@ ${lanes.join("\n")}
                 }
               }
             }
-            forEachChild(node, visit2);
+            forEachChild(node, visit);
           }
         }
         function checkTypeParameterListsIdentical(symbol) {
@@ -140630,14 +140630,14 @@ ${lanes.join("\n")}
           if (!state.hoistedLocalVariables) {
             state.hoistedLocalVariables = [];
           }
-          visit2(node.name);
-          function visit2(node2) {
+          visit(node.name);
+          function visit(node2) {
             if (node2.kind === 80) {
               state.hoistedLocalVariables.push(node2);
             } else {
               for (const element of node2.elements) {
                 if (!isOmittedExpression(element)) {
-                  visit2(element.name);
+                  visit(element.name);
                 }
               }
             }
@@ -142284,13 +142284,13 @@ ${lanes.join("\n")}
         }
         function visitCommaExpression(node) {
           let pendingExpressions = [];
-          visit2(node.left);
-          visit2(node.right);
+          visit(node.left);
+          visit(node.right);
           return factory2.inlineExpressions(pendingExpressions);
-          function visit2(node2) {
+          function visit(node2) {
             if (isBinaryExpression(node2) && node2.operatorToken.kind === 28) {
-              visit2(node2.left);
-              visit2(node2.right);
+              visit(node2.left);
+              visit(node2.right);
             } else {
               if (containsYield(node2) && pendingExpressions.length > 0) {
                 emitWorker(1, [factory2.createExpressionStatement(factory2.inlineExpressions(pendingExpressions))]);
@@ -165444,10 +165444,10 @@ ${lanes.join("\n")}
         let buildOrder;
         let circularDiagnostics;
         for (const root of roots) {
-          visit2(root);
+          visit(root);
         }
         return circularDiagnostics ? { buildOrder: buildOrder || emptyArray, circularDiagnostics } : buildOrder || emptyArray;
-        function visit2(configFileName, inCircularContext) {
+        function visit(configFileName, inCircularContext) {
           const projPath = toResolvedConfigFilePath(state, configFileName);
           if (permanentMarks.has(projPath)) return;
           if (temporaryMarks.has(projPath)) {
@@ -165467,7 +165467,7 @@ ${lanes.join("\n")}
           if (parsed && parsed.projectReferences) {
             for (const ref of parsed.projectReferences) {
               const resolvedRefPath = resolveProjectName(state, ref.path);
-              visit2(resolvedRefPath, inCircularContext || ref.circular);
+              visit(resolvedRefPath, inCircularContext || ref.circular);
             }
           }
           circularityReportStack.pop();
@@ -172432,7 +172432,7 @@ ${lanes.join("\n")}
         let withSemicolon = 0;
         let withoutSemicolon = 0;
         const nStatementsToObserve = 5;
-        forEachChild(sourceFile, function visit2(node) {
+        forEachChild(sourceFile, function visit(node) {
           if (syntaxRequiresTrailingSemicolonOrASI(node.kind)) {
             const lastToken = node.getLastToken(sourceFile);
             if ((lastToken == null ? void 0 : lastToken.kind) === 27) {
@@ -172455,7 +172455,7 @@ ${lanes.join("\n")}
           if (withSemicolon + withoutSemicolon >= nStatementsToObserve) {
             return true;
           }
-          return forEachChild(node, visit2);
+          return forEachChild(node, visit);
         });
         if (withSemicolon === 0 && withoutSemicolon <= 1) {
           return true;
@@ -181327,7 +181327,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
           let errors2;
           let permittedJumps = 4;
           let seenLabels;
-          visit2(nodeToCheck);
+          visit(nodeToCheck);
           if (rangeFacts & 8) {
             const container = getThisContainer(
               nodeToCheck,
@@ -181341,7 +181341,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
             }
           }
           return errors2;
-          function visit2(node2) {
+          function visit(node2) {
             if (errors2) {
               return true;
             }
@@ -181437,7 +181437,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
               case 256: {
                 const label = node2.label;
                 (seenLabels || (seenLabels = [])).push(label.escapedText);
-                forEachChild(node2, visit2);
+                forEachChild(node2, visit);
                 seenLabels.pop();
                 break;
               }
@@ -181469,7 +181469,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
                 }
                 break;
               default:
-                forEachChild(node2, visit2);
+                forEachChild(node2, visit);
                 break;
             }
             permittedJumps = savedPermittedJumps;
@@ -182912,7 +182912,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
       function collectTokens(program, sourceFile, span, collector, cancellationToken) {
         const typeChecker = program.getTypeChecker();
         let inJSXElement = false;
-        function visit2(node) {
+        function visit(node) {
           switch (node.kind) {
             case 267:
             case 263:
@@ -182980,10 +182980,10 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
               }
             }
           }
-          forEachChild(node, visit2);
+          forEachChild(node, visit);
           inJSXElement = prevInJSXElement;
         }
-        visit2(sourceFile);
+        visit(sourceFile);
       }
       function classifySymbol2(symbol, meaning) {
         const flags = symbol.getFlags();
@@ -183725,7 +183725,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
         }
         computeNamedDeclarations() {
           const result = createMultiMap();
-          this.forEachChild(visit2);
+          this.forEachChild(visit);
           return result;
           function addDeclaration(declaration) {
             const name = getDeclarationName(declaration);
@@ -183744,7 +183744,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
             const name = getNonAssignedNameOfDeclaration(declaration);
             return name && (isComputedPropertyName(name) && isPropertyAccessExpression(name.expression) ? name.expression.name.text : isPropertyName(name) ? getNameFromPropertyName(name) : void 0);
           }
-          function visit2(node) {
+          function visit(node) {
             switch (node.kind) {
               case 262:
               case 218:
@@ -183763,7 +183763,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
                     declarations.push(functionDeclaration);
                   }
                 }
-                forEachChild(node, visit2);
+                forEachChild(node, visit);
                 break;
               case 263:
               case 231:
@@ -183780,7 +183780,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
               case 178:
               case 187:
                 addDeclaration(node);
-                forEachChild(node, visit2);
+                forEachChild(node, visit);
                 break;
               case 169:
                 if (!hasSyntacticModifier(
@@ -183795,11 +183795,11 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
               case 208: {
                 const decl = node;
                 if (isBindingPattern(decl.name)) {
-                  forEachChild(decl.name, visit2);
+                  forEachChild(decl.name, visit);
                   break;
                 }
                 if (decl.initializer) {
-                  visit2(decl.initializer);
+                  visit(decl.initializer);
                 }
               }
               // falls through
@@ -183812,9 +183812,9 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
                 const exportDeclaration = node;
                 if (exportDeclaration.exportClause) {
                   if (isNamedExports(exportDeclaration.exportClause)) {
-                    forEach(exportDeclaration.exportClause.elements, visit2);
+                    forEach(exportDeclaration.exportClause.elements, visit);
                   } else {
-                    visit2(exportDeclaration.exportClause.name);
+                    visit(exportDeclaration.exportClause.name);
                   }
                 }
                 break;
@@ -183828,7 +183828,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
                     if (importClause.namedBindings.kind === 274) {
                       addDeclaration(importClause.namedBindings);
                     } else {
-                      forEach(importClause.namedBindings.elements, visit2);
+                      forEach(importClause.namedBindings.elements, visit);
                     }
                   }
                 }
@@ -183839,7 +183839,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
                 }
               // falls through
               default:
-                forEachChild(node, visit2);
+                forEachChild(node, visit);
             }
           }
         }
@@ -187886,7 +187886,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
         const pos = skipTrivia(sourceFile.text, moveRangePastModifiers(functionToConvert).pos);
         changes.insertModifierAt(sourceFile, pos, 134, { suffix: " " });
         for (const returnStatement of returnStatements) {
-          forEachChild(returnStatement, function visit2(node) {
+          forEachChild(returnStatement, function visit(node) {
             if (isCallExpression(node)) {
               const newNodes = transformExpression(
                 node,
@@ -187900,7 +187900,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
               }
               changes.replaceNodeWithNodes(sourceFile, returnStatement, newNodes);
             } else if (!isFunctionLike(node)) {
-              forEachChild(node, visit2);
+              forEachChild(node, visit);
               if (hasFailed()) {
                 return true;
               }
@@ -187923,17 +187923,17 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
           return /* @__PURE__ */ new Set();
         }
         const setOfExpressionsToReturn = /* @__PURE__ */ new Set();
-        forEachChild(func.body, function visit2(node) {
+        forEachChild(func.body, function visit(node) {
           if (isPromiseReturningCallExpression(node, checker, "then")) {
             setOfExpressionsToReturn.add(getNodeId(node));
-            forEach(node.arguments, visit2);
+            forEach(node.arguments, visit);
           } else if (isPromiseReturningCallExpression(node, checker, "catch") || isPromiseReturningCallExpression(node, checker, "finally")) {
             setOfExpressionsToReturn.add(getNodeId(node));
-            forEachChild(node, visit2);
+            forEachChild(node, visit);
           } else if (isPromiseTypedExpression(node, checker)) {
             setOfExpressionsToReturn.add(getNodeId(node));
           } else {
-            forEachChild(node, visit2);
+            forEachChild(node, visit);
           }
         });
         return setOfExpressionsToReturn;
@@ -187971,9 +187971,9 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
       function renameCollidingVarNames(nodeToRename, checker, synthNamesMap) {
         const identsToRenameMap = /* @__PURE__ */ new Map();
         const collidingSymbolMap = createMultiMap();
-        forEachChild(nodeToRename, function visit2(node) {
+        forEachChild(nodeToRename, function visit(node) {
           if (!isIdentifier(node)) {
-            forEachChild(node, visit2);
+            forEachChild(node, visit);
             return;
           }
           const symbol = checker.getSymbolAtLocation(node);
@@ -188476,7 +188476,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
       }
       function transformReturnStatementWithFixablePromiseHandler(transformer, innerRetStmt, hasContinuation, continuationArgName) {
         let innerCbBody = [];
-        forEachChild(innerRetStmt, function visit2(node) {
+        forEachChild(innerRetStmt, function visit(node) {
           if (isCallExpression(node)) {
             const temp = transformExpression(node, node, transformer, hasContinuation, continuationArgName);
             innerCbBody = innerCbBody.concat(temp);
@@ -188484,7 +188484,7 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
               return;
             }
           } else if (!isFunctionLike(node)) {
-            forEachChild(node, visit2);
+            forEachChild(node, visit);
           }
         });
         return innerCbBody;
@@ -197334,17 +197334,17 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
       }
       function tryGetAutoImportableReferenceFromTypeNode(importTypeNode, scriptTarget) {
         let symbols;
-        const typeNode = visitNode(importTypeNode, visit2, isTypeNode);
+        const typeNode = visitNode(importTypeNode, visit, isTypeNode);
         if (symbols && typeNode) {
           return { typeNode, symbols };
         }
-        function visit2(node) {
+        function visit(node) {
           if (isLiteralImportTypeNode(node) && node.qualifier) {
             const firstIdentifier = getFirstIdentifier(node.qualifier);
             if (!firstIdentifier.symbol) {
               return visitEachChild(
                 node,
-                visit2,
+                visit,
                 /*context*/
                 void 0
               );
@@ -197352,12 +197352,12 @@ ${newComment.split("\n").map((c2) => ` * ${c2}`).join("\n")}
             const name = getNameForExportedSymbol(firstIdentifier.symbol, scriptTarget);
             const qualifier = name !== firstIdentifier.text ? replaceFirstIdentifierOfEntityName(node.qualifier, factory.createIdentifier(name)) : node.qualifier;
             symbols = append(symbols, firstIdentifier.symbol);
-            const typeArguments = visitNodes2(node.typeArguments, visit2, isTypeNode);
+            const typeArguments = visitNodes2(node.typeArguments, visit, isTypeNode);
             return factory.createTypeReferenceNode(qualifier, typeArguments);
           }
           return visitEachChild(
             node,
-            visit2,
+            visit,
             /*context*/
             void 0
           );
@@ -291938,7 +291938,7 @@ var unwrapType = (type) => {
 var isScalar = (type) => type instanceof import_graphql.GraphQLScalarType || ["String", "Int", "Float", "Boolean", "ID"].includes(type.name);
 var isEnum = (type) => type instanceof import_graphql.GraphQLEnumType;
 var isListTypeDeep = (type) => (0, import_graphql.isNonNullType)(type) ? (0, import_graphql.isListType)(type.ofType) : (0, import_graphql.isListType)(type);
-var toKebabCase = (str) => str.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+var toKebabCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2").toLowerCase();
 var toPascalCase = (str) => str.replace(/(^\w|-\w)/g, (m3) => m3.replace("-", "").toUpperCase());
 var toCamelCase = (str) => str.charAt(0).toLowerCase() + str.slice(1);
 var toRelativeImport = (from, to) => {
@@ -292098,6 +292098,22 @@ var resolveEnumAccess = (enumName, dir) => {
   const relPath = toRelativeImport(dir, enumPath);
   return { value, import: `import { ${enumName} } from "${relPath}";` };
 };
+var resolveStorybookTestImport = () => {
+  try {
+    const pkgPath = import_path.default.resolve("package.json");
+    const pkg = JSON.parse(import_fs.default.readFileSync(pkgPath, "utf-8"));
+    const allDeps = {
+      ...pkg.dependencies,
+      ...pkg.devDependencies
+    };
+    if (allDeps["storybook"]) {
+      return "storybook/test";
+    }
+    return "@storybook/test";
+  } catch {
+    return "@storybook/test";
+  }
+};
 var CACHE_FILE = ".gql-codegen-cache.json";
 var loadCache = () => {
   if (!import_fs.default.existsSync(CACHE_FILE)) {
@@ -292119,7 +292135,7 @@ var hasManualChanges = (factoryPath) => {
   const cache = loadCache();
   const cached = cache[factoryPath];
   if (!cached) {
-    return true;
+    return isManualFactory(factoryPath);
   }
   const factoryStat = import_fs.default.statSync(factoryPath);
   return factoryStat.mtime.getTime() > cached.lastGenerated;
@@ -292139,7 +292155,7 @@ var isManualFactory = (factoryPath) => {
   ];
   return manualMarkers.some((marker) => marker.test(content));
 };
-var shouldRegenerateFactory = (fragmentPath, factoryPath, schemaContent2, currentFieldDefinitions) => {
+var shouldRegenerateFactory = (fragmentPath, factoryPath, schemaContent, currentFieldDefinitions) => {
   if (!import_fs.default.existsSync(factoryPath)) {
     return {
       shouldRegenerate: true,
@@ -292147,7 +292163,7 @@ var shouldRegenerateFactory = (fragmentPath, factoryPath, schemaContent2, curren
     };
   }
   const isManual = isManualFactory(factoryPath) || hasManualChanges(factoryPath);
-  const diff = analyzeFactoryChanges(fragmentPath, factoryPath, schemaContent2, currentFieldDefinitions);
+  const diff = analyzeFactoryChanges(fragmentPath, factoryPath, schemaContent, currentFieldDefinitions);
   const hasChanges = diff.added.length > 0 || diff.removed.length > 0 || diff.typeChanged.length > 0;
   if (isManual && hasChanges) {
     return {
@@ -292167,7 +292183,7 @@ var shouldRegenerateFactory = (fragmentPath, factoryPath, schemaContent2, curren
   const cache = loadCache();
   const fragmentContent = import_fs.default.readFileSync(fragmentPath, "utf-8");
   const currentFragmentHash = import_crypto.default.createHash("sha256").update(fragmentContent).digest("hex");
-  const currentSchemaHash = import_crypto.default.createHash("sha256").update(schemaContent2).digest("hex");
+  const currentSchemaHash = import_crypto.default.createHash("sha256").update(schemaContent).digest("hex");
   const cached = cache[factoryPath];
   const shouldRegenerate = !cached || cached.fragmentHash !== currentFragmentHash || cached.schemaHash !== currentSchemaHash;
   if (shouldRegenerate) {
@@ -292183,18 +292199,18 @@ var shouldRegenerateFactory = (fragmentPath, factoryPath, schemaContent2, curren
     };
   }
 };
-var markFactoryAsGenerated = (fragmentPath, factoryPath, schemaContent2) => {
+var markFactoryAsGenerated = (fragmentPath, factoryPath, schemaContent) => {
   const cache = loadCache();
   const fragmentContent = import_fs.default.readFileSync(fragmentPath, "utf-8");
   cache[factoryPath] = {
     fragmentHash: import_crypto.default.createHash("sha256").update(fragmentContent).digest("hex"),
-    schemaHash: import_crypto.default.createHash("sha256").update(schemaContent2).digest("hex"),
+    schemaHash: import_crypto.default.createHash("sha256").update(schemaContent).digest("hex"),
     lastGenerated: Date.now(),
     autoGenerated: true
   };
   saveCache(cache);
 };
-var analyzeFactoryChanges = (fragmentPath, factoryPath, schemaContent2, currentFieldDefinitions) => {
+var analyzeFactoryChanges = (fragmentPath, factoryPath, schemaContent, currentFieldDefinitions) => {
   const cache = loadCache();
   const cached = cache[factoryPath];
   const currentFragmentContent = import_fs.default.readFileSync(fragmentPath, "utf-8");
@@ -292228,7 +292244,7 @@ var analyzeFactoryChanges = (fragmentPath, factoryPath, schemaContent2, currentF
   const removed = Array.from(existingFields).filter((field) => !currentFields.has(field));
   const common_fields = Array.from(currentFields).filter((field) => existingFields.has(field));
   const currentFragmentHash = import_crypto.default.createHash("sha256").update(currentFragmentContent).digest("hex");
-  const currentSchemaHash = import_crypto.default.createHash("sha256").update(schemaContent2).digest("hex");
+  const currentSchemaHash = import_crypto.default.createHash("sha256").update(schemaContent).digest("hex");
   const fragmentChanged = cached && cached.fragmentHash !== currentFragmentHash;
   const schemaChanged = cached && cached.schemaHash !== currentSchemaHash;
   const typeChanged = schemaChanged ? common_fields : [];
@@ -292295,7 +292311,7 @@ var updateManualFactory = (factoryPath, diff, newFieldDefinitions, options = {})
   const constMatch = factoryContent.match(/const\s+(\w+):\s*(\w+)\s*=\s*\{/);
   if (!constMatch) {
     console.warn(`Could not find default object in ${factoryPath}, skipping update`);
-    return;
+    return false;
   }
   const objectName = constMatch[1];
   const typeName = constMatch[2];
@@ -292312,7 +292328,7 @@ var updateManualFactory = (factoryPath, diff, newFieldDefinitions, options = {})
   }
   if (braceCount !== 0) {
     console.warn(`Could not find matching brace in ${factoryPath}, skipping update`);
-    return;
+    return false;
   }
   const objectBody = factoryContent.substring(startIndex + 1, endIndex);
   const fullMatch = factoryContent.substring(constMatch.index, endIndex + 2);
@@ -292409,7 +292425,7 @@ var isDefaultGeneratedValue = (value) => {
     trimmed === "[]" || trimmed === "null" || trimmed === "undefined"
   );
 };
-var shouldRegenerateHandler = (gqlPath, handlerPath, schemaContent2) => {
+var shouldRegenerateHandler = (gqlPath, handlerPath, schemaContent) => {
   if (!import_fs.default.existsSync(handlerPath)) {
     return {
       shouldRegenerate: true,
@@ -292436,9 +292452,8 @@ var shouldRegenerateHandler = (gqlPath, handlerPath, schemaContent2) => {
   const cached = cache[handlerPath];
   if (!cached) {
     return {
-      shouldRegenerate: false,
-      reason: ``
-      // Don't regenerate files without cache history
+      shouldRegenerate: true,
+      reason: `No cache entry found, regenerating handler`
     };
   }
   const handlerStat = import_fs.default.statSync(handlerPath);
@@ -292452,7 +292467,7 @@ var shouldRegenerateHandler = (gqlPath, handlerPath, schemaContent2) => {
   }
   const gqlContent = import_fs.default.readFileSync(gqlPath, "utf-8");
   const currentGqlHash = import_crypto.default.createHash("sha256").update(gqlContent).digest("hex");
-  const currentSchemaHash = import_crypto.default.createHash("sha256").update(schemaContent2).digest("hex");
+  const currentSchemaHash = import_crypto.default.createHash("sha256").update(schemaContent).digest("hex");
   const shouldRegenerate = cached.fragmentHash !== currentGqlHash || cached.schemaHash !== currentSchemaHash;
   if (shouldRegenerate) {
     return {
@@ -292467,12 +292482,12 @@ var shouldRegenerateHandler = (gqlPath, handlerPath, schemaContent2) => {
     };
   }
 };
-var markHandlerAsGenerated = (gqlPath, handlerPath, schemaContent2) => {
+var markHandlerAsGenerated = (gqlPath, handlerPath, schemaContent) => {
   const cache = loadCache();
   const gqlContent = import_fs.default.readFileSync(gqlPath, "utf-8");
   cache[handlerPath] = {
     fragmentHash: import_crypto.default.createHash("sha256").update(gqlContent).digest("hex"),
-    schemaHash: import_crypto.default.createHash("sha256").update(schemaContent2).digest("hex"),
+    schemaHash: import_crypto.default.createHash("sha256").update(schemaContent).digest("hex"),
     lastGenerated: Date.now(),
     autoGenerated: true
   };
@@ -292483,12 +292498,12 @@ var markHandlerAsGenerated = (gqlPath, handlerPath, schemaContent2) => {
 var SCHEMA_PATH = import_path2.default.resolve("schema.graphql");
 var IDS_PATH = import_path2.default.resolve("src/gql/ids.ts");
 var generateFactory = async (fragmentPath) => {
-  const schemaContent2 = import_fs2.default.readFileSync(SCHEMA_PATH, "utf-8");
-  const schema2 = (0, import_graphql2.buildSchema)(schemaContent2);
+  const schemaContent = import_fs2.default.readFileSync(SCHEMA_PATH, "utf-8");
+  const schema = (0, import_graphql2.buildSchema)(schemaContent);
   const idsProject = new import_ts_morph.Project();
   const idsSource = idsProject.addSourceFileAtPath(IDS_PATH);
   const idsObject = idsSource.getVariableDeclarationOrThrow("ids").getInitializerIfKindOrThrow(import_ts_morph.SyntaxKind.ObjectLiteralExpression);
-  const fragmentFiles = fragmentPath ? [fragmentPath] : import_fast_glob2.default.sync("src/**/*/*.fragment.gql");
+  const fragmentFiles = fragmentPath ? [fragmentPath] : import_fast_glob2.default.sync("src/**/*.fragment.gql");
   for (const filePath of fragmentFiles) {
     const content = import_fs2.default.readFileSync(filePath, "utf-8");
     const fragmentAst = (0, import_graphql2.parse)(content);
@@ -292496,7 +292511,7 @@ var generateFactory = async (fragmentPath) => {
       (d2) => d2.kind === "FragmentDefinition"
     );
     if (!fragment) continue;
-    const type = schema2.getType(
+    const type = schema.getType(
       fragment.typeCondition.name.value
     );
     if (!type) continue;
@@ -292592,7 +292607,7 @@ var generateFactory = async (fragmentPath) => {
     }
     const importManager = new ImportManager(fragmentDir, factoryFilePath);
     const imports = [
-      `import { ${typeName} } from "./${fragmentBase}.fragment.generated";`
+      `import { type ${typeName} } from "./${fragmentBase}.fragment.generated";`
     ];
     const fields = [];
     const fieldDefinitions = {};
@@ -292650,7 +292665,7 @@ var generateFactory = async (fragmentPath) => {
           if (fieldToFragmentMap[gqlFieldName]) {
             const hintedFragmentName = toPascalCase(fieldToFragmentMap[gqlFieldName]);
             const hintedPath = import_fast_glob2.default.sync(
-              `src/**/*/${toKebabCase(hintedFragmentName)}.fragment.gql`
+              `src/**/${toKebabCase(hintedFragmentName)}.fragment.gql`
             )[0];
             if (hintedPath) {
               try {
@@ -292666,7 +292681,7 @@ var generateFactory = async (fragmentPath) => {
           if (!nestedFragmentPath) {
             fragmentToSearch = toPascalCase(baseType.name);
             nestedFragmentPath = import_fast_glob2.default.sync(
-              `src/**/*/${toKebabCase(fragmentToSearch)}.fragment.gql`
+              `src/**/${toKebabCase(fragmentToSearch)}.fragment.gql`
             )[0];
           }
           if (!nestedFragmentPath) {
@@ -292707,7 +292722,7 @@ var generateFactory = async (fragmentPath) => {
     const { shouldRegenerate, reason, requiresUpdate, diff } = shouldRegenerateFactory(
       filePath,
       factoryFilePath,
-      schemaContent2,
+      schemaContent,
       fieldDefinitions
     );
     if (!shouldRegenerate) {
@@ -292721,7 +292736,7 @@ var generateFactory = async (fragmentPath) => {
         { mergedImports: importManager.buildMergedImports() }
       );
       if (wasUpdated) {
-        markFactoryAsGenerated(filePath, factoryFilePath, schemaContent2);
+        markFactoryAsGenerated(filePath, factoryFilePath, schemaContent);
       }
       continue;
     }
@@ -292740,11 +292755,40 @@ var generateFactory = async (fragmentPath) => {
     ].join("\n");
     const isNewFile = !import_fs2.default.existsSync(factoryFilePath);
     import_fs2.default.writeFileSync(factoryFilePath, fileContent);
-    markFactoryAsGenerated(filePath, factoryFilePath, schemaContent2);
+    markFactoryAsGenerated(filePath, factoryFilePath, schemaContent);
     if (isNewFile) {
       console.log(`Created ${factoryName}`);
     } else {
       console.log(`Regenerated ${factoryName}`);
+    }
+    const collectionFactoryPath = import_path2.default.join(
+      fragmentDir,
+      `${fragmentBase}s.factory.ts`
+    );
+    if (!import_fs2.default.existsSync(collectionFactoryPath)) {
+      const hasIdField = fieldDefinitions["id"] !== void 0;
+      const idsKey = toCamelCase(type.name);
+      const collectionImports = [
+        `import { type ${typeName} } from "./${fragmentBase}.fragment.generated";`,
+        `import { ${factoryName} } from "./${fragmentBase}.factory";`
+      ];
+      if (hasIdField) {
+        collectionImports.push(`import { ids } from "${idsRelativePath}";`);
+      }
+      const secondItemOverrides = hasIdField ? `{ id: ids.${idsKey}[1] }` : `{}`;
+      const collectionContent = [
+        ...collectionImports,
+        "",
+        `const default${fragmentName}s: ${typeName}[] = [`,
+        `  ${factoryName}(),`,
+        `  ${factoryName}(${secondItemOverrides}),`,
+        `];`,
+        "",
+        `export const ${factoryName}s = (overwrites?: ${typeName}[]): ${typeName}[] =>`,
+        `  overwrites ?? default${fragmentName}s;`
+      ].join("\n");
+      import_fs2.default.writeFileSync(collectionFactoryPath, collectionContent);
+      console.log(`Created ${factoryName}s (collection)`);
     }
   }
   idsSource.saveSync();
@@ -292753,7 +292797,7 @@ var generateFactory = async (fragmentPath) => {
 // src/commands/factories.ts
 var import_fast_glob3 = __toESM(require_out4());
 var factoriesCommand = async () => {
-  const fragmentPaths = import_fast_glob3.default.sync("src/**/*/*.fragment.gql");
+  const fragmentPaths = import_fast_glob3.default.sync("src/**/*.fragment.gql");
   if (fragmentPaths.length === 0) {
     console.warn("No .fragment.gql files found. Nothing to generate.");
     return;
@@ -292768,9 +292812,80 @@ var import_path3 = __toESM(require("path"));
 var import_fs3 = __toESM(require("fs"));
 var import_fast_glob4 = __toESM(require_out4());
 var import_graphql3 = __toESM(require_graphql2());
-var schemaContent = import_fs3.default.readFileSync("schema.graphql", "utf-8");
-var schema = (0, import_graphql3.buildSchema)(schemaContent);
+function buildMockResponse(selections, parentType, schema, imports, dir, indent = "      ") {
+  const lines = [];
+  for (const sel of selections) {
+    if (sel.kind === import_graphql3.Kind.FRAGMENT_SPREAD) {
+      const frag = sel;
+      const fragName = frag.name.value;
+      const factoryName = `createMock${fragName}`;
+      const fragFile = import_fast_glob4.default.sync(
+        `src/**/${toKebabCase(fragName)}.factory.ts`
+      )[0];
+      if (fragFile) {
+        const relImport = toRelativeImport(dir, fragFile);
+        imports.add(`import { ${factoryName} } from "${relImport}";`);
+      }
+    } else if (sel.kind === import_graphql3.Kind.FIELD) {
+      const field = sel;
+      const name = field.name.value;
+      const fieldDef = parentType.getFields()[name];
+      if (!fieldDef) continue;
+      const returnType = fieldDef.type;
+      let unwrapped = returnType;
+      while ((0, import_graphql3.isNonNullType)(unwrapped)) unwrapped = unwrapped.ofType;
+      const isList = unwrapped instanceof import_graphql3.GraphQLList;
+      const namedType = (0, import_graphql3.getNamedType)(returnType);
+      if (!namedType) continue;
+      if (field.selectionSet) {
+        const spreadOnly = field.selectionSet.selections.length === 1 && field.selectionSet.selections[0].kind === import_graphql3.Kind.FRAGMENT_SPREAD;
+        if (spreadOnly) {
+          const frag = field.selectionSet.selections[0];
+          const fragName = frag.name.value;
+          const factoryName = `createMock${fragName}`;
+          const fragFile = import_fast_glob4.default.sync(
+            `src/**/${toKebabCase(fragName)}.factory.ts`
+          )[0];
+          if (fragFile) {
+            const relImport = toRelativeImport(dir, fragFile);
+            imports.add(`import { ${factoryName} } from "${relImport}";`);
+            const call = isList ? `[${factoryName}()]` : `${factoryName}()`;
+            lines.push(`${indent}${name}: ${call},`);
+          }
+        } else if ((0, import_graphql3.isObjectType)(namedType)) {
+          const innerIndent = indent + "  ";
+          const innerContent = buildMockResponse(
+            field.selectionSet.selections,
+            namedType,
+            schema,
+            imports,
+            dir,
+            innerIndent
+          );
+          if (isList) {
+            lines.push(`${indent}${name}: [{`);
+          } else {
+            lines.push(`${indent}${name}: {`);
+          }
+          lines.push(innerContent);
+          lines.push(`${innerIndent}__typename: "${namedType.name}",`);
+          if (isList) {
+            lines.push(`${indent}}],`);
+          } else {
+            lines.push(`${indent}},`);
+          }
+        }
+      } else {
+        lines.push(`${indent}${name}: "mock-${name}",`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
 var handlersCommand = async () => {
+  const schemaContent = import_fs3.default.readFileSync("schema.graphql", "utf-8");
+  const schema = (0, import_graphql3.buildSchema)(schemaContent);
+  const storybookImport = resolveStorybookTestImport();
   const gqlFiles = import_fast_glob4.default.sync("src/**/*.{query,mutation}.gql");
   if (gqlFiles.length === 0) {
     console.warn("No .{query,mutation}.gql files found. Nothing to generate.");
@@ -292793,56 +292908,27 @@ var handlersCommand = async () => {
     const mockHandlerName = `mock${toPascalCase(opName)}${toPascalCase(opType)}`;
     const mockHandlerFile = import_fast_glob4.default.sync(`${dir}/*.query.generated.ts`).concat(import_fast_glob4.default.sync(`${dir}/*.mutation.generated.ts`))[0];
     const relMockHandlerImport = mockHandlerFile ? toRelativeImport(dir, mockHandlerFile) : null;
-    const fragmentMap = {};
-    for (const def of ast.definitions) {
-      if (def.kind === import_graphql3.Kind.FRAGMENT_DEFINITION) {
-        fragmentMap[def.name.value] = def;
-      }
-    }
     const imports = /* @__PURE__ */ new Set();
-    const factories = /* @__PURE__ */ new Set();
-    const typeInfo = new import_graphql3.TypeInfo(schema);
+    const rootType = opType === "query" ? schema.getQueryType() : schema.getMutationType();
     let mockData = "";
-    (0, import_graphql3.visit)(
-      operation,
-      (0, import_graphql3.visitWithTypeInfo)(typeInfo, {
-        Field(node) {
-          const parentType = typeInfo.getParentType();
-          let fieldDef;
-          if (parentType && (0, import_graphql3.isObjectType)(parentType)) {
-            fieldDef = parentType.getFields()[node.name.value];
-          }
-          const returnType = fieldDef?.type;
-          const name = node.name.value;
-          let namedType = returnType;
-          while ((0, import_graphql3.isNonNullType)(namedType) || namedType instanceof import_graphql3.GraphQLList) {
-            namedType = namedType.ofType;
-          }
-          const returnTypeName = (0, import_graphql3.getNamedType)(namedType)?.name;
-          const factoryName = `createMock${returnTypeName}`;
-          factories.add(factoryName);
-          let type = returnType;
-          while ((0, import_graphql3.isNonNullType)(type)) type = type.ofType;
-          const isList = type instanceof import_graphql3.GraphQLList;
-          const factoryCall = isList ? `[${factoryName}()]` : `${factoryName}()`;
-          mockData += `      ${name}: ${factoryCall},
-`;
-          if (returnTypeName) {
-            const factoryPath = import_fast_glob4.default.sync(
-              `src/**/*/${toKebabCase(returnTypeName)}.factory.ts`
-            )[0];
-            if (factoryPath) {
-              const relImport = toRelativeImport(dir, factoryPath);
-              imports.add(`import { ${factoryName} } from "${relImport}";`);
-            }
-          }
-        }
-      })
-    );
-    let handlerContent = `import { HttpResponse } from "msw";
-import { fn } from "@storybook/test";
-${Array.from(imports).join("\n")}
-${relMockHandlerImport ? `import { ${mockHandlerName} } from "${relMockHandlerImport}";` : ""}
+    if (rootType && operation.selectionSet) {
+      mockData = buildMockResponse(
+        operation.selectionSet.selections,
+        rootType,
+        schema,
+        imports,
+        dir
+      );
+    }
+    const allImports = [
+      `import { HttpResponse } from "msw";`,
+      `import { fn } from "${storybookImport}";`,
+      ...Array.from(imports)
+    ];
+    if (relMockHandlerImport) {
+      allImports.push(`import { ${mockHandlerName} } from "${relMockHandlerImport}";`);
+    }
+    let handlerContent = `${allImports.join("\n")}
 
 export const ${spyName} = fn();
 
@@ -292850,7 +292936,8 @@ export const ${handlerName} = ${mockHandlerName}(({ variables }) => {
   ${spyName}(variables);
   return HttpResponse.json({
     data: {
-${mockData}    },
+${mockData}
+    },
   });
 });
 
