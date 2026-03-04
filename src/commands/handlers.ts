@@ -73,10 +73,9 @@ function buildMockObject(
   return lines.map((l) => (l.startsWith("  ") ? l : "    " + l)).join("\n");
 }
 
-const schemaContent = fs.readFileSync("schema.graphql", "utf-8");
-const schema = buildSchema(schemaContent);
-
 export const handlersCommand = async () => {
+  const schemaContent = fs.readFileSync("schema.graphql", "utf-8");
+  const schema = buildSchema(schemaContent);
   const gqlFiles = glob.sync("src/**/*.{query,mutation}.gql");
   if (gqlFiles.length === 0) {
     console.warn("No .{query,mutation}.gql files found. Nothing to generate.");
