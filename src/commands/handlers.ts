@@ -7,10 +7,7 @@ import {
   FragmentSpreadNode,
   FieldNode,
   SelectionNode,
-  visit,
-  visitWithTypeInfo,
   isNonNullType,
-  TypeInfo,
   GraphQLList,
   buildSchema,
   isObjectType,
@@ -25,38 +22,19 @@ import {
   toRelativeImport,
 } from "../lib/helpers";
 
-// Recursively build mock object for a selection set
-function buildMockObject(
-  { selections }: { selections: readonly SelectionNode[] },
-  fragmentMap: Record<string, any>,
+// Recursively build mock response data from a selection set, using schema type info
+function buildMockResponse(
+  selections: readonly SelectionNode[],
+  parentType: import("graphql").GraphQLObjectType,
+  schema: import("graphql").GraphQLSchema,
   imports: Set<string>,
-  factories: Set<string>,
   dir: string,
+  indent: string = "      ",
 ): string {
-  let lines: string[] = [];
+  const lines: string[] = [];
+
   for (const sel of selections) {
-    if (sel.kind === Kind.FIELD) {
-      const field = sel as FieldNode;
-      const name = field.name.value;
-      if (field.selectionSet) {
-        // Nested object
-        lines.push(`  ${name}: {`);
-        lines.push(
-          buildMockObject(
-            field.selectionSet,
-            fragmentMap,
-            imports,
-            factories,
-            dir,
-          ),
-        );
-        lines.push(`    __typename: "${toPascalCase(name)}",`);
-        lines.push(`  },`);
-      } else {
-        // Scalar or id
-        lines.push(`  ${name}: "mock-${name}",`);
-      }
-    } else if (sel.kind === Kind.FRAGMENT_SPREAD) {
+    if (sel.kind === Kind.FRAGMENT_SPREAD) {
       const frag = sel as FragmentSpreadNode;
       const fragName = frag.name.value;
       const factoryName = `createMock${fragName}`;
@@ -66,12 +44,76 @@ function buildMockObject(
       if (fragFile) {
         const relImport = toRelativeImport(dir, fragFile);
         imports.add(`import { ${factoryName} } from "${relImport}";`);
-        factories.add(factoryName);
-        lines.push(`  ...${factoryName}(),`);
+        // For fragment spreads at top level, the factory call is the field value
+        // (handled by the parent field that contains this spread)
+      }
+    } else if (sel.kind === Kind.FIELD) {
+      const field = sel as FieldNode;
+      const name = field.name.value;
+      const fieldDef = parentType.getFields()[name];
+      if (!fieldDef) continue;
+
+      const returnType = fieldDef.type;
+
+      // Check if it's a list (unwrapping NonNulls)
+      let unwrapped = returnType;
+      while (isNonNullType(unwrapped)) unwrapped = unwrapped.ofType;
+      const isList = unwrapped instanceof GraphQLList;
+
+      const namedType = getNamedType(returnType);
+      if (!namedType) continue;
+
+      if (field.selectionSet) {
+        // Check if the selection set contains only a fragment spread — use factory directly
+        const spreadOnly = field.selectionSet.selections.length === 1 &&
+          field.selectionSet.selections[0].kind === Kind.FRAGMENT_SPREAD;
+
+        if (spreadOnly) {
+          const frag = field.selectionSet.selections[0] as FragmentSpreadNode;
+          const fragName = frag.name.value;
+          const factoryName = `createMock${fragName}`;
+          const fragFile = glob.sync(
+            `src/**/${toKebabCase(fragName)}.factory.ts`,
+          )[0];
+          if (fragFile) {
+            const relImport = toRelativeImport(dir, fragFile);
+            imports.add(`import { ${factoryName} } from "${relImport}";`);
+            const call = isList ? `[${factoryName}()]` : `${factoryName}()`;
+            lines.push(`${indent}${name}: ${call},`);
+          }
+        } else if (isObjectType(namedType)) {
+          // Nested object with mixed selections — build inline object
+          const innerIndent = indent + "  ";
+          const innerContent = buildMockResponse(
+            field.selectionSet.selections,
+            namedType,
+            schema,
+            imports,
+            dir,
+            innerIndent,
+          );
+          if (isList) {
+            lines.push(`${indent}${name}: [{`);
+          } else {
+            lines.push(`${indent}${name}: {`);
+          }
+          lines.push(innerContent);
+          lines.push(`${innerIndent}__typename: "${namedType.name}",`);
+          if (isList) {
+            lines.push(`${indent}}],`);
+          } else {
+            lines.push(`${indent}},`);
+          }
+        }
+      } else {
+        // Scalar field — shouldn't typically appear in handler mock data
+        // but handle gracefully
+        lines.push(`${indent}${name}: "mock-${name}",`);
       }
     }
   }
-  return lines.map((l) => (l.startsWith("  ") ? l : "    " + l)).join("\n");
+
+  return lines.join("\n");
 }
 
 export const handlersCommand = async () => {
@@ -105,65 +147,25 @@ export const handlersCommand = async () => {
     const relMockHandlerImport = mockHandlerFile
       ? toRelativeImport(dir, mockHandlerFile)
       : null;
-    // Build fragment map
-    const fragmentMap: Record<string, any> = {};
-    for (const def of ast.definitions) {
-      if (def.kind === Kind.FRAGMENT_DEFINITION) {
-        fragmentMap[def.name.value] = def;
-      }
-    }
-    // Build imports and factories
+    // Build imports
     const imports = new Set<string>();
-    const factories = new Set<string>();
-    // Build mock response
-    const typeInfo = new TypeInfo(schema);
+
+    // Get the root query/mutation type from the schema
+    const rootType = opType === "query"
+      ? schema.getQueryType()
+      : schema.getMutationType();
+
+    // Build mock response recursively from the operation's selection set
     let mockData = "";
-
-    visit(
-      operation,
-      visitWithTypeInfo(typeInfo, {
-        Field(node) {
-          const parentType = typeInfo.getParentType();
-          let fieldDef;
-          if (parentType && isObjectType(parentType)) {
-            fieldDef = parentType.getFields()[node.name.value];
-          }
-          const returnType = fieldDef?.type;
-
-          const name = node.name.value;
-          let namedType = returnType;
-          while (isNonNullType(namedType) || namedType instanceof GraphQLList) {
-            namedType = namedType.ofType;
-          }
-
-          const returnTypeName = getNamedType(namedType)?.name;
-          const factoryName = `createMock${returnTypeName}`;
-          factories.add(factoryName);
-
-          // Detect if it's a list (unwrapping NonNulls)
-          let type = returnType;
-          while (isNonNullType(type)) type = type.ofType;
-          const isList = type instanceof GraphQLList;
-
-          const factoryCall = isList
-            ? `[${factoryName}()]`
-            : `${factoryName}()`;
-
-          mockData += `      ${name}: ${factoryCall},\n`;
-
-          // Try to find and add import
-          if (returnTypeName) {
-            const factoryPath = glob.sync(
-              `src/**/${toKebabCase(returnTypeName)}.factory.ts`,
-            )[0];
-            if (factoryPath) {
-              const relImport = toRelativeImport(dir, factoryPath);
-              imports.add(`import { ${factoryName} } from "${relImport}";`);
-            }
-          }
-        },
-      }),
-    );
+    if (rootType && operation.selectionSet) {
+      mockData = buildMockResponse(
+        operation.selectionSet.selections,
+        rootType,
+        schema,
+        imports,
+        dir,
+      );
+    }
     // Compose handler file
     let handlerContent = `import { HttpResponse } from "msw";
 import { fn } from "${storybookImport}";
@@ -176,7 +178,8 @@ export const ${handlerName} = ${mockHandlerName}(({ variables }) => {
   ${spyName}(variables);
   return HttpResponse.json({
     data: {
-${mockData}    },
+${mockData}
+    },
   });
 });
 
