@@ -186,7 +186,7 @@ export const generateFactory = async (fragmentPath: string) => {
     // Build field definitions first
     const importManager = new ImportManager(fragmentDir, factoryFilePath);
     const imports = [
-      `import { ${typeName} } from "./${fragmentBase}.fragment.generated";`,
+      `import { type ${typeName} } from "./${fragmentBase}.fragment.generated";`,
     ];
     const fields: string[] = [];
     const fieldDefinitions: Record<string, string> = {};
