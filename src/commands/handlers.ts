@@ -167,10 +167,16 @@ export const handlersCommand = async () => {
       );
     }
     // Compose handler file
-    let handlerContent = `import { HttpResponse } from "msw";
-import { fn } from "${storybookImport}";
-${Array.from(imports).join("\n")}
-${relMockHandlerImport ? `import { ${mockHandlerName} } from "${relMockHandlerImport}";` : ""}
+    const allImports = [
+      `import { HttpResponse } from "msw";`,
+      `import { fn } from "${storybookImport}";`,
+      ...Array.from(imports),
+    ];
+    if (relMockHandlerImport) {
+      allImports.push(`import { ${mockHandlerName} } from "${relMockHandlerImport}";`);
+    }
+
+    let handlerContent = `${allImports.join("\n")}
 
 export const ${spyName} = fn();
 
