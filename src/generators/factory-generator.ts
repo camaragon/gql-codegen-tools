@@ -261,7 +261,7 @@ export const generateFactory = async (fragmentPath: string) => {
           if (fieldToFragmentMap[gqlFieldName]) {
             const hintedFragmentName = toPascalCase(fieldToFragmentMap[gqlFieldName]);
             const hintedPath = glob.sync(
-              `src/**/*/${toKebabCase(hintedFragmentName)}.fragment.gql`,
+              `src/**/${toKebabCase(hintedFragmentName)}.fragment.gql`,
             )[0];
             
             // Validate that the fragment's type condition matches the field's base type
@@ -282,7 +282,7 @@ export const generateFactory = async (fragmentPath: string) => {
           if (!nestedFragmentPath) {
             fragmentToSearch = toPascalCase(baseType.name);
             nestedFragmentPath = glob.sync(
-              `src/**/*/${toKebabCase(fragmentToSearch)}.fragment.gql`,
+              `src/**/${toKebabCase(fragmentToSearch)}.fragment.gql`,
             )[0];
           }
           

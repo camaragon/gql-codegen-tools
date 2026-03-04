@@ -61,7 +61,7 @@ function buildMockObject(
       const fragName = frag.name.value;
       const factoryName = `createMock${fragName}`;
       const fragFile = glob.sync(
-        `src/**/*/${toKebabCase(fragName)}.factory.ts`,
+        `src/**/${toKebabCase(fragName)}.factory.ts`,
       )[0];
       if (fragFile) {
         const relImport = toRelativeImport(dir, fragFile);
@@ -154,7 +154,7 @@ export const handlersCommand = async () => {
           // Try to find and add import
           if (returnTypeName) {
             const factoryPath = glob.sync(
-              `src/**/*/${toKebabCase(returnTypeName)}.factory.ts`,
+              `src/**/${toKebabCase(returnTypeName)}.factory.ts`,
             )[0];
             if (factoryPath) {
               const relImport = toRelativeImport(dir, factoryPath);
