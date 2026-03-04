@@ -308,8 +308,9 @@ export const hasManualChanges = (factoryPath: string): boolean => {
   const cached = cache[factoryPath];
   
   if (!cached) {
-    // No cache entry means we've never generated this file
-    return true; // Assume it's manual
+    // No cache entry (e.g. fresh clone, cache cleared) — check for manual markers
+    // rather than assuming manual, so auto-generated files can be regenerated
+    return isManualFactory(factoryPath);
   }
 
   // Check if file was modified after our last generation
@@ -781,10 +782,10 @@ export const shouldRegenerateHandler = (
   const cached = cache[handlerPath];
   
   if (!cached) {
-    // No cache entry - assume it was manually created, don't regenerate
-    return { 
-      shouldRegenerate: false, 
-      reason: `` // Don't regenerate files without cache history
+    // No cache entry (e.g. fresh clone, cache cleared) — regenerate unless manually marked
+    return {
+      shouldRegenerate: true,
+      reason: `No cache entry found, regenerating handler`
     };
   }
 
