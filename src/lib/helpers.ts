@@ -274,6 +274,25 @@ export const resolveEnumAccess = (
   return { value, import: `import { ${enumName} } from "${relPath}";` };
 };
 
+export const resolveStorybookTestImport = (): string => {
+  try {
+    const pkgPath = path.resolve("package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+    const allDeps = {
+      ...pkg.dependencies,
+      ...pkg.devDependencies,
+    };
+
+    // Storybook 8+ uses "storybook/test", older versions use "@storybook/test"
+    if (allDeps["storybook"]) {
+      return "storybook/test";
+    }
+    return "@storybook/test";
+  } catch {
+    return "@storybook/test";
+  }
+};
+
 interface CacheEntry {
   fragmentHash: string;
   schemaHash: string;

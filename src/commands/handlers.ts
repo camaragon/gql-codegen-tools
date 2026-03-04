@@ -18,6 +18,7 @@ import {
 } from "graphql";
 import {
   markHandlerAsGenerated,
+  resolveStorybookTestImport,
   shouldRegenerateHandler,
   toKebabCase,
   toPascalCase,
@@ -76,6 +77,7 @@ function buildMockObject(
 export const handlersCommand = async () => {
   const schemaContent = fs.readFileSync("schema.graphql", "utf-8");
   const schema = buildSchema(schemaContent);
+  const storybookImport = resolveStorybookTestImport();
   const gqlFiles = glob.sync("src/**/*.{query,mutation}.gql");
   if (gqlFiles.length === 0) {
     console.warn("No .{query,mutation}.gql files found. Nothing to generate.");
@@ -164,7 +166,7 @@ export const handlersCommand = async () => {
     );
     // Compose handler file
     let handlerContent = `import { HttpResponse } from "msw";
-import { fn } from "@storybook/test";
+import { fn } from "${storybookImport}";
 ${Array.from(imports).join("\n")}
 ${relMockHandlerImport ? `import { ${mockHandlerName} } from "${relMockHandlerImport}";` : ""}
 
