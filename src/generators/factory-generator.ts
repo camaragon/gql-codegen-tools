@@ -46,7 +46,7 @@ export const generateFactory = async (fragmentPath: string) => {
 
   const fragmentFiles = fragmentPath
     ? [fragmentPath]
-    : glob.sync("src/**/*/*.fragment.gql");
+    : glob.sync("src/**/*.fragment.gql");
 
   for (const filePath of fragmentFiles) {
     const content = fs.readFileSync(filePath, "utf-8");
