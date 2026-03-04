@@ -385,6 +385,43 @@ export const generateFactory = async (fragmentPath: string) => {
     } else {
       console.log(`Regenerated ${factoryName}`);
     }
+
+    // Generate collection factory if it doesn't already exist
+    const collectionFactoryPath = path.join(
+      fragmentDir,
+      `${fragmentBase}s.factory.ts`,
+    );
+    if (!fs.existsSync(collectionFactoryPath)) {
+      const hasIdField = fieldDefinitions["id"] !== undefined;
+      const idsKey = toCamelCase(type.name);
+
+      const collectionImports = [
+        `import { type ${typeName} } from "./${fragmentBase}.fragment.generated";`,
+        `import { ${factoryName} } from "./${fragmentBase}.factory";`,
+      ];
+      if (hasIdField) {
+        collectionImports.push(`import { ids } from "${idsRelativePath}";`);
+      }
+
+      const secondItemOverrides = hasIdField
+        ? `{ id: ids.${idsKey}[1] }`
+        : `{}`;
+
+      const collectionContent = [
+        ...collectionImports,
+        "",
+        `const default${fragmentName}s: ${typeName}[] = [`,
+        `  ${factoryName}(),`,
+        `  ${factoryName}(${secondItemOverrides}),`,
+        `];`,
+        "",
+        `export const ${factoryName}s = (overwrites?: ${typeName}[]): ${typeName}[] =>`,
+        `  overwrites ?? default${fragmentName}s;`,
+      ].join("\n");
+
+      fs.writeFileSync(collectionFactoryPath, collectionContent);
+      console.log(`Created ${factoryName}s (collection)`);
+    }
   }
 
   idsSource.saveSync();
