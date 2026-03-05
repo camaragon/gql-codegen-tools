@@ -5,10 +5,13 @@ A CLI tool for generating TypeScript mock factories and MSW handlers from GraphQ
 ## Features
 
 - **Factory Generation**: Creates type-safe mock factories from GraphQL fragments
-- **Handler Generation**: Generates MSW (Mock Service Worker) handlers for GraphQL operations
+- **Collection Factories**: Generates companion array factories alongside single-entity factories
+- **Handler Generation**: Generates MSW (Mock Service Worker) handlers with nested response support
+- **Spy Export**: Every handler exports a Storybook-compatible `fn()` spy for test assertions
 - **Incremental Updates**: Only regenerates files when source fragments or schema change
 - **Manual Customization**: Preserves manual modifications while adding new fields automatically
 - **Dependency Resolution**: Automatically handles nested fragment dependencies
+- **Storybook Auto-Detection**: Detects `storybook/test` vs `@storybook/test` from your project's dependencies
 - **Cache Management**: Tracks generation history to optimize build times
 
 ## Installation
@@ -43,18 +46,27 @@ The tool expects your project to follow this structure:
 
 ```
 project-root/
-├── schema.graphql              # GraphQL schema file
+├── schema.graphql                  # GraphQL schema file
 ├── src/
-│   ├── gql/
-│   │   └── ids.ts             # ID management file
-│   └── components/
-│       ├── user/
-│       │   ├── user.fragment.gql
-│       │   └── user.factory.ts      # Generated
-│       └── posts/
-│           ├── get-posts.query.gql
-│           └── get-posts.handler.ts # Generated
+│   └── gql/
+│       ├── ids.ts                  # Centralized ID constants
+│       └── advertiser/
+│           ├── fragments/
+│           │   ├── advertiser.fragment.gql
+│           │   ├── advertiser.fragment.generated.ts
+│           │   ├── advertiser.factory.ts       # Generated
+│           │   └── advertisers.factory.ts      # Generated (collection)
+│           ├── queries/
+│           │   ├── advertisers.query.gql
+│           │   ├── advertisers.query.generated.ts
+│           │   └── advertisers.handler.ts      # Generated
+│           └── mutations/
+│               ├── create-advertiser.mutation.gql
+│               ├── create-advertiser.mutation.generated.ts
+│               └── create-advertiser.handler.ts # Generated
 ```
+
+Fragment files are discovered at `src/**/*.fragment.gql` and operation files at `src/**/*.{query,mutation}.gql`.
 
 ### Integration with npm scripts
 
@@ -65,10 +77,7 @@ Add these scripts to your `package.json`:
   "scripts": {
     "codegen:factories": "gql-codegen-tools factories",
     "codegen:handlers": "gql-codegen-tools handlers",
-    "codegen": "npm run codegen:factories && npm run codegen:handlers",
-    "dev": "npm run codegen && vite",
-    "build": "npm run codegen && vite build",
-    "test": "npm run codegen:factories && vitest"
+    "codegen": "npm run codegen:factories && npm run codegen:handlers"
   }
 }
 ```
@@ -78,53 +87,70 @@ Add these scripts to your `package.json`:
 ### Input: GraphQL Fragment
 
 ```graphql
-# user.fragment.gql
-fragment User on User {
+# advertiser.fragment.gql
+fragment Advertiser on Advertiser {
   id
   name
-  email
-  isActive
+  industry
+  website
 }
 ```
 
-### Output: TypeScript Factory
+### Output: Single-Entity Factory
 
 ```typescript
-// user.factory.ts
-import { UserFragment } from "./user.fragment.generated";
+// advertiser.factory.ts
+import { type AdvertiserFragment } from "./advertiser.fragment.generated";
+import { ids } from "../../ids";
 
-const defaultUser: UserFragment = {
-  id: ids.user[0],
-  name: faker.person.name(),
-  email: faker.internet.email(),
-  isActive: faker.datatype.boolean(),
-  __typename: "User",
+const defaultAdvertiser: AdvertiserFragment = {
+  id: ids.advertiser[0],
+  name: "lorem",
+  industry: "Autos & Vehicles",
+  website: "www.advertiser.com",
+  __typename: "Advertiser",
 };
 
-export const createMockUser = (overwrites: Partial<UserFragment> = {}): UserFragment => ({
-  ...defaultUser,
+export const createMockAdvertiser = (overwrites: Partial<AdvertiserFragment> = {}): AdvertiserFragment => ({
+  ...defaultAdvertiser,
   ...overwrites,
 });
 ```
 
-### Manual Customization
+### Output: Collection Factory
 
-You can customize generated factories and the tool will preserve your changes:
+A companion collection factory is generated alongside each single-entity factory:
 
 ```typescript
-// Manually customized factory
-const defaultUser: UserFragment = {
-  id: "test-user-123",        // Custom ID preserved
-  name: faker.person.name(),  // Generated value updated automatically
-  email: "test@example.com",  // Custom email preserved
-  isActive: true,             // Custom boolean preserved
-  __typename: "User",
+// advertisers.factory.ts
+import { type AdvertiserFragment } from "./advertiser.fragment.generated";
+import { createMockAdvertiser } from "./advertiser.factory";
+import { ids } from "../../ids";
+
+const defaultAdvertisers: AdvertiserFragment[] = [
+  createMockAdvertiser(),
+  createMockAdvertiser({ id: ids.advertiser[1] }),
+];
+
+export const createMockAdvertisers = (overwrites?: AdvertiserFragment[]): AdvertiserFragment[] =>
+  overwrites ?? defaultAdvertisers;
+```
+
+### Nested Fragments
+
+When a fragment references other fragments, the tool automatically generates factories for dependencies first, then composes them:
+
+```typescript
+const defaultAdvertiserWithHierarchy: AdvertiserWithHierarchyFragment = {
+  ...createMockAdvertiser(),
+  hierarchy: createMockHierarchyWithParent(),
+  __typename: "Advertiser",
 };
 ```
 
-When new fields are added to the fragment, they will be automatically inserted while preserving your customizations.
+### Manual Customization
 
-### Protecting Factories from Updates
+You can customize generated factories and the tool will preserve your changes. When new fields are added to the fragment, they are automatically inserted while preserving your customizations.
 
 Add a manual marker to prevent any automatic updates:
 
@@ -140,10 +166,10 @@ const defaultUser: UserFragment = {
 ### Input: GraphQL Operation
 
 ```graphql
-# get-user.query.gql
-query GetUser($id: ID!) {
-  user(id: $id) {
-    ...User
+# advertisers.query.gql
+query Advertisers($filter: String) {
+  advertisers(name: $filter) {
+    ...Advertiser
   }
 }
 ```
@@ -151,25 +177,50 @@ query GetUser($id: ID!) {
 ### Output: MSW Handler
 
 ```typescript
-// get-user.handler.ts
+// advertisers.handler.ts
 import { HttpResponse } from "msw";
-import { fn } from "@storybook/test";
-import { createMockUser } from "../user/user.factory";
-import { mockGetUserQuery } from "./get-user.query.generated";
+import { fn } from "storybook/test";
+import { createMockAdvertiser } from "../fragments/advertiser.factory";
+import { mockAdvertisersQuery } from "./advertisers.query.generated";
 
-export const getUserSpy = fn();
+export const advertisersSpy = fn();
 
-export const getUser = mockGetUserQuery(({ variables }) => {
-  getUserSpy(variables);
+export const advertisers = mockAdvertisersQuery(({ variables }) => {
+  advertisersSpy(variables);
   return HttpResponse.json({
     data: {
-      user: createMockUser(),
+      advertisers: [createMockAdvertiser()],
     },
   });
 });
 
-export default getUser;
+export default advertisers;
 ```
+
+### Nested Response Shapes
+
+For queries with nested wrapper types, the handler builds properly nested response objects:
+
+```typescript
+export const summary = mockSummaryQuery(({ variables }) => {
+  summarySpy(variables);
+  return HttpResponse.json({
+    data: {
+      summary: {
+        metrics: [createMockPerformanceMetric()],
+        popMetrics: createMockPopMetrics(),
+        __typename: "SummaryResponse",
+      },
+    },
+  });
+});
+```
+
+### Storybook Import Detection
+
+The tool reads your project's `package.json` to determine the correct import path for `fn()`:
+- Projects with the `storybook` package (v8+) use `import { fn } from "storybook/test"`
+- Older projects use `import { fn } from "@storybook/test"`
 
 ## Configuration
 
@@ -183,97 +234,54 @@ The tool creates a `.gql-codegen-cache.json` file to track generation history. A
 
 ### ID Management
 
-Create an `src/gql/ids.ts` file for consistent ID generation:
+Create an `src/gql/ids.ts` file for consistent ID generation across factories:
 
 ```typescript
 export const ids = {
-  user: ["user-1", "user-2", "user-3"],
-  post: ["post-1", "post-2", "post-3"],
-  // Add more entity IDs as needed
+  advertiser: [1, 2, 3],
+  hierarchy: [1, 2, 3],
+  file: ["1", "2", "3"],
 };
 ```
 
-## Development Workflow
-
-### Watch Mode
-
-For development, you can set up file watching:
-
-```bash
-npm install -D chokidar-cli concurrently
-```
-
-Add to package.json:
-```json
-{
-  "scripts": {
-    "codegen:watch": "chokidar \"src/**/*.fragment.gql\" \"src/**/*.{query,mutation}.gql\" \"schema.graphql\" -c \"npm run codegen\"",
-    "dev": "concurrently \"npm run codegen:watch\" \"vite\""
-  }
-}
-```
-
-### CI/CD Integration
-
-For continuous integration, ensure codegen runs before builds:
-
-```yaml
-# .github/workflows/ci.yml
-- name: Generate code
-  run: npm run codegen
-
-- name: Build
-  run: npm run build
-
-- name: Test
-  run: npm run test
-```
+The tool automatically adds new entries to this file when it encounters `id` fields for new types.
 
 ## Dependencies
 
-The generated code expects these peer dependencies:
+The generated code expects these peer dependencies in your project:
 
 ```json
 {
   "devDependencies": {
     "@faker-js/faker": "^9.0.0",
-    "@storybook/test": "^7.0.0",
-    "msw": "^2.0.0"
+    "msw": "^2.0.0",
+    "storybook": "^8.0.0"
   }
 }
 ```
 
-## TypeScript Configuration
-
-Ensure your `tsconfig.json` includes the generated files:
-
-```json
-{
-  "include": [
-    "src/**/*",
-    "src/**/*.generated.ts"
-  ]
-}
-```
+For projects using Storybook 7, use `@storybook/test` instead of `storybook`.
 
 ## Troubleshooting
 
 ### "No .fragment.gql files found"
-Ensure your GraphQL fragments are saved with the `.fragment.gql` extension in the `src/` directory.
+Ensure your GraphQL fragments are saved with the `.fragment.gql` extension somewhere under `src/`.
 
 ### "Could not find default object"
 This usually indicates a malformed factory file. Check that your factory follows the expected structure with a `const defaultObjectName: TypeName = { ... };` pattern.
 
 ### Factories not updating
-Check if your factory has manual modifications. The tool preserves manual changes by default. To force regeneration, delete the factory file or clear the cache file.
+Check if your factory has manual modifications. The tool preserves manual changes by default. To force regeneration, delete the factory file and the `.gql-codegen-cache.json` cache file.
+
+### Files not regenerating after a fresh clone
+The cache file is gitignored, so on a fresh clone all auto-generated files will be regenerated on the next run. Files with manual markers (`// @manual`, `// Custom`) are left untouched.
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
+4. Submit a pull request
 
 ## License
 
